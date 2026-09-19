@@ -22,6 +22,17 @@ const IMAGE_REF: ImageAttachmentRef = {
 const readImage: WireImageReader = () => Promise.resolve({ ref: IMAGE_REF, data: new Uint8Array([1, 2, 3]) })
 
 const IMAGE_PART = { type: 'image_url' as const, image_url: { url: 'data:image/png;base64,AQID' } }
+const OMITTED_PART = { type: 'text' as const, text: '[image omitted: the request image budget was exceeded]' }
+
+/** A reader whose payload is `size` arbitrary bytes, for budget arithmetic. */
+function readerOfSize(size: number): WireImageReader {
+  return () => Promise.resolve({ ref: IMAGE_REF, data: new Uint8Array(size).fill(7) })
+}
+
+/** One user message carrying one image. */
+function imageMessage(): Message {
+  return createUserMessage({ content: [{ type: 'image', attachment: IMAGE_REF }], source: { kind: 'plugin', plugin: 'test' } })
+}
 
 describe('serializeMessages', () => {
   it('maps user text to string content', async () => {
@@ -485,5 +496,24 @@ describe('review fixes: assistant content shapes', () => {
       source: { kind: 'plugin', plugin: 'test' },
     })])
     expect(wire[0]).toMatchObject({ content: '' })
+  })
+})
+
+describe('request image budget', () => {
+  it('keeps the newest images and replaces the oldest with a notice once the bound is reached', async () => {
+    const wire = await serializeMessages([imageMessage(), imageMessage()], readerOfSize(1), 40)
+    // One data URL is ~35 bytes, so only the newest occurrence fits in 40.
+    expect(wire).toEqual([
+      { role: 'user', content: [OMITTED_PART] },
+      { role: 'user', content: [expect.objectContaining({ type: 'image_url' })] },
+    ])
+  })
+
+  it('replaces an image that alone exceeds the bound, and sends no image at all with a zero budget', async () => {
+    const single = await serializeMessages([imageMessage()], readerOfSize(1), 10)
+    expect(single).toEqual([{ role: 'user', content: [OMITTED_PART] }])
+
+    const wire = await serializeMessages([imageMessage()], readImage)
+    expect(wire).toEqual([{ role: 'user', content: [IMAGE_PART] }])
   })
 })

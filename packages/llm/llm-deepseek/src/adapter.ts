@@ -8,7 +8,7 @@
  * @module dsh-llm-deepseek/adapter
  */
 
-import { attributionHeaders, CONTEXT_WINDOW_EXCEEDED_CODE, isContextWindowExceededError, isQuotaExceededError, LlmAdapter, LlmError, ProviderRequestId, QUOTA_EXCEEDED_CODE, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { attributionHeaders, CONTEXT_WINDOW_EXCEEDED_CODE, errorChain, isContextWindowExceededError, isQuotaExceededError, LlmAdapter, LlmError, ProviderRequestId, QUOTA_EXCEEDED_CODE, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type {
   GenerateOptions,
   LlmModelInfo,
@@ -75,6 +75,13 @@ export interface DeepSeekConnectionOptions {
   streamIdleTimeoutMs: number
   /** Provider-owned model-request retry policy, already resolved. */
   retryPolicy: ResolvedRetryPolicy
+  /**
+   * Accumulated base64 image payload one request may carry. An image that has
+   * been admitted rides every later request of its session, so the bound is
+   * applied to the request itself: once it is reached the oldest images are
+   * replaced by text placeholders and the request still completes.
+   */
+  maxRequestImageBytes: number
 }
 
 /** Constructor options for {@link DeepSeekAdapter}: the operation-local resolution hooks the plugin owns. */
@@ -101,6 +108,14 @@ export interface DeepSeekAdapterOptions {
 
 /** Default maximum idle interval while an adapter stream read is outstanding. */
 export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 300_000
+
+/**
+ * Default accumulated base64 image payload one request may carry. The bound is
+ * deliberately a request bound rather than an admission bound: a session whose
+ * history already holds large images keeps completing requests, because the
+ * oldest ones degrade to text placeholders instead of failing the turn.
+ */
+export const DEFAULT_MAX_REQUEST_IMAGE_BYTES = 20 * 1024 * 1024
 /** Default combined request/response context capacity. */
 export const DEFAULT_CONTEXT_WINDOW = 1_000_000
 /** Default per-request output-token cap. */
@@ -335,11 +350,11 @@ export class DeepSeekAdapter extends LlmAdapter {
       options,
       connection.defaults,
       this.imageReader(connection, options.model, signal),
+      connection.maxRequestImageBytes,
     ).catch((error: unknown) => {
       if (error instanceof LlmError) throw error
       throw new LlmError(
-        `DeepSeek request for model "${options.model}" could not be assembled: `
-        + (error instanceof Error ? error.message : String(error)),
+        `DeepSeek request for model "${options.model}" could not be assembled: ${errorChain(error)}`,
         'REQUEST_ASSEMBLY_FAILED',
         { cause: error },
       )

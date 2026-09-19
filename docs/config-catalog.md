@@ -889,6 +889,13 @@ export interface Config {
   models?: DeepSeekCatalogModel[]
   /** Maximum provider idle time while one stream read is outstanding (default five minutes). */
   streamIdleTimeoutMs?: number
+  /**
+   * Accumulated base64 image payload one request may carry (default 20 MiB).
+   * Past the bound the oldest images become text placeholders, so a session
+   * whose history holds large images keeps completing requests instead of
+   * failing every later turn.
+   */
+  maxRequestImageBytes?: number
   /** Provider-owned model-request retry policy; omission uses normal defaults. */
   retryPolicy?: RetryPolicyConfig
 }
@@ -915,7 +922,7 @@ export interface DeepSeekCatalogModel {
 
 Depends on: [`ModelModality`](../packages/llm/llm/src/index.ts) · [`RetryPolicyConfig`](../packages/llm/llm/src/index.ts)
 
-Source: [`packages/llm/llm-deepseek/src/index.ts:62`](../packages/llm/llm-deepseek/src/index.ts)
+Source: [`packages/llm/llm-deepseek/src/index.ts:63`](../packages/llm/llm-deepseek/src/index.ts)
 
 <a id="deepseek-aidsh-llm-pi-ai"></a>
 

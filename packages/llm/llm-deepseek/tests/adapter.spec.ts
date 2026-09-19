@@ -1020,6 +1020,22 @@ describe('plugin registration and config', () => {
     },
   )
 
+  it.each([0, -1, 1.5, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects an invalid adapter-wide maxRequestImageBytes %s',
+    async (maxRequestImageBytes) => {
+      expect(() => resolveAdapterOptions({ maxRequestImageBytes }))
+        .toThrow(/maxRequestImageBytes must be a positive safe integer/)
+
+      const ctx = new Context()
+      await ctx.plugin(LlmRuntime)
+      await expect(ctx.plugin(LlmDeepSeek, {
+        baseURL: 'http://127.0.0.1:1',
+        maxRequestImageBytes,
+      })).rejects.toThrow(/maxRequestImageBytes/)
+      expect(ctx.llm.listProviders()).toEqual([])
+    },
+  )
+
   it.each([0, 1.5, Number.MAX_SAFE_INTEGER + 1])(
     'rejects invalid adapter-wide maxTokens %s',
     async (maxTokens) => {

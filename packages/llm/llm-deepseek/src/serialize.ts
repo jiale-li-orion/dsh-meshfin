@@ -11,6 +11,7 @@
 
 import type { ImageAttachmentRef, StoredImageAttachment } from '@deepseek-ai/dsh-attachment'
 import { contentHasImage, LlmError } from '@deepseek-ai/dsh-llm'
+import { DEFAULT_MAX_REQUEST_IMAGE_BYTES } from './adapter.ts'
 import type { ContentBlock, GenerateOptions, Message } from '@deepseek-ai/dsh-llm'
 import type {
   WireImagePart,
@@ -84,6 +85,23 @@ function assertTextOnly(blocks: readonly ContentBlock[]): void {
   }
 }
 
+/**
+ * Model-facing text that replaces one image the request budget could not carry.
+ * The model sees that an image existed and why it is missing, so a turn that
+ * degrades stays intelligible instead of looking like the attachment vanished.
+ */
+const OMITTED_IMAGE_NOTICE = '[image omitted: the request image budget was exceeded]'
+
+/** One image occurrence in wire order, with the bytes it would add to the request. */
+interface PreparedImage {
+  /** The `data:` URL this occurrence contributes when it is kept. */
+  readonly url: string
+  /** Encoded byte length the base64 payload adds to the request. */
+  readonly bytes: number
+  /** Cleared once the budget, counted newest-first, has run out. */
+  keep: boolean
+}
+
 /** Encode one image attachment as the `data:` URL the wire expects. */
 async function imageUrl(ref: ImageAttachmentRef, readImage: WireImageReader | undefined): Promise<string> {
   if (readImage === undefined) {
@@ -116,17 +134,118 @@ function toolResultText(blocks: readonly ContentBlock[]): string {
  */
 async function toolResultImages(
   blocks: readonly ContentBlock[],
-  readImage: WireImageReader | undefined,
-): Promise<WireImagePart[]> {
-  const parts: WireImagePart[] = []
+  images: ImageCursor,
+): Promise<(WireImagePart | WireTextPart)[]> {
+  const parts: (WireImagePart | WireTextPart)[] = []
   for (const block of blocks) {
     if (block.type === 'image') {
-      parts.push({ type: 'image_url', image_url: { url: await imageUrl(block.attachment, readImage) } })
+      parts.push(await images.next(block.attachment))
       continue
     }
-    if (block.type === 'tool-result') parts.push(...await toolResultImages(block.content, readImage))
+    if (block.type === 'tool-result') parts.push(...await toolResultImages(block.content, images))
   }
   return parts
+}
+
+/**
+ * Prepare every image the request would carry, in wire order, and drop the
+ * oldest occurrences once the accumulated base64 payload passes the budget.
+ * An admitted image rides every later request of its session, so bounding the
+ * request is what keeps a long session completing: without it one large image
+ * in the history fails every following turn at the provider.
+ * @param messages - the harness conversation, in order.
+ * @param readImage - attachment reader; an absent reader leaves the list empty,
+ *   so the caller still refuses image content with `UNSUPPORTED_CONTENT`.
+ * @param maxBytes - accumulated base64 payload one request may carry.
+ * @returns every image occurrence in wire order, oldest ones already dropped.
+ */
+async function prepareImages(
+  messages: readonly Message[],
+  readImage: WireImageReader | undefined,
+  maxBytes: number,
+): Promise<PreparedImage[]> {
+  if (readImage === undefined) return []
+  const prepared: PreparedImage[] = []
+  const collect = async (ref: ImageAttachmentRef): Promise<void> => {
+    const url = await imageUrl(ref, readImage)
+    prepared.push({ url, bytes: url.length, keep: true })
+  }
+  for (const message of messages) {
+    if (message.role === 'system' || message.role === 'assistant') continue
+    for (const block of message.content) {
+      if (block.type === 'image') await collect(block.attachment)
+    }
+    for (const block of message.content) {
+      if (block.type !== 'tool-result') continue
+      for (const ref of toolResultImageRefs(block.content)) await collect(ref)
+    }
+  }
+  assertBudget(prepared, maxBytes)
+  return prepared
+}
+
+/**
+ * Clear `keep` on the oldest occurrences until the retained payload fits.
+ * @param prepared - occurrences in wire order.
+ * @param maxBytes - accumulated base64 payload one request may carry.
+ */
+function assertBudget(prepared: PreparedImage[], maxBytes: number): void {
+  let retained = 0
+  for (let index = prepared.length - 1; index >= 0; index -= 1) {
+    const image = prepared[index]
+    /* v8 ignore next -- the loop indexes its own array. */
+    if (image === undefined) continue
+    if (retained + image.bytes > maxBytes) {
+      image.keep = false
+      continue
+    }
+    retained += image.bytes
+  }
+}
+
+/**
+ * Every image reference a tool result carries, at any nesting depth.
+ * @param blocks - the tool result's typed content.
+ * @returns the attachments in content order.
+ */
+function toolResultImageRefs(blocks: readonly ContentBlock[]): ImageAttachmentRef[] {
+  const refs: ImageAttachmentRef[] = []
+  for (const block of blocks) {
+    if (block.type === 'image') refs.push(block.attachment)
+    else if (block.type === 'tool-result') refs.push(...toolResultImageRefs(block.content))
+  }
+  return refs
+}
+
+/**
+ * Hand out prepared occurrences in the same wire order {@link prepareImages}
+ * collected them: a kept occurrence becomes its image part, a dropped one the
+ * notice text. An absent reader falls back to {@link imageUrl}, which refuses.
+ */
+class ImageCursor {
+  private index = 0
+
+  /**
+   * @param prepared - occurrences in wire order, empty without a reader.
+   * @param readImage - the reader, for the refusal an absent one produces.
+   */
+  constructor(
+    private readonly prepared: readonly PreparedImage[],
+    private readonly readImage: WireImageReader | undefined,
+  ) {}
+
+  /**
+   * The wire part for one image occurrence.
+   * @param ref - the occurrence's attachment.
+   * @returns the image part, or the notice text when the budget dropped it.
+   */
+  async next(ref: ImageAttachmentRef): Promise<WireImagePart | WireTextPart> {
+    const image = this.prepared[this.index]
+    if (image === undefined) return { type: 'image_url', image_url: { url: await imageUrl(ref, this.readImage) } }
+    this.index += 1
+    if (!image.keep) return { type: 'text', text: OMITTED_IMAGE_NOTICE }
+    return { type: 'image_url', image_url: { url: image.url } }
+  }
 }
 
 /** Model-facing lead-in for the user message carrying a tool result's images. */
@@ -146,7 +265,7 @@ const TOOL_RESULT_IMAGE_SENTINEL = '(see attached image)'
  */
 async function userContent(
   blocks: readonly ContentBlock[],
-  readImage: WireImageReader | undefined,
+  images: ImageCursor,
 ): Promise<WireUserContent> {
   const text: string[] = []
   const parts: (WireTextPart | WireImagePart)[] = []
@@ -161,7 +280,7 @@ async function userContent(
     }
     if (block.type === 'image') {
       hasImage = true
-      parts.push({ type: 'image_url', image_url: { url: await imageUrl(block.attachment, readImage) } })
+      parts.push(await images.next(block.attachment))
       continue
     }
     if (block.type === 'tool-result') continue
@@ -214,14 +333,20 @@ function serializeAssistant(message: Message): WireMessage {
  * results of one assistant turn.
  * @param messages - the harness conversation, in order.
  * @param readImage - attachment reader for user and tool-result images; undefined rejects them.
+ * @param maxRequestImageBytes - accumulated base64 image payload this request may carry.
  * @returns the wire messages; order preserved, each tool result expanded into its own entry.
  */
 export async function serializeMessages(
   messages: Message[],
   readImage?: WireImageReader,
+  maxRequestImageBytes = DEFAULT_MAX_REQUEST_IMAGE_BYTES,
 ): Promise<WireMessage[]> {
+  const images = new ImageCursor(
+    await prepareImages(messages, readImage, maxRequestImageBytes),
+    readImage,
+  )
   const wire: WireMessage[] = []
-  let pendingImages: WireImagePart[] = []
+  let pendingImages: (WireImagePart | WireTextPart)[] = []
   /** Emit the user message that carries a finished run of tool-result images. */
   const flushToolImages = (): void => {
     if (pendingImages.length === 0) return
@@ -249,20 +374,20 @@ export async function serializeMessages(
     const toolResults = message.content.filter(block => block.type === 'tool-result')
     if (toolResults.length === 0) {
       flushToolImages()
-      wire.push({ role: 'user', content: await userContent(message.content, readImage) })
+      wire.push({ role: 'user', content: await userContent(message.content, images) })
       continue
     }
-    const content = await userContent(message.content, readImage)
+    const content = await userContent(message.content, images)
     if (typeof content !== 'string' || content.length > 0) wire.push({ role: 'user', content })
     for (const result of toolResults) {
-      const images = await toolResultImages(result.content, readImage)
-      pendingImages.push(...images)
+      const parts = await toolResultImages(result.content, images)
+      pendingImages.push(...parts)
       wire.push({
         role: 'tool',
         tool_call_id: result.toolCallId,
         // Empty tool output still needs SOME content on the wire.
         content: toolResultText(result.content)
-          || (images.length > 0 ? TOOL_RESULT_IMAGE_SENTINEL : '(no output)'),
+          || (parts.length > 0 ? TOOL_RESULT_IMAGE_SENTINEL : '(no output)'),
       })
     }
   }
@@ -277,18 +402,20 @@ export async function serializeMessages(
  * @param options - the harness request (model, history, system, tools, sampling).
  * @param defaults - adapter-level thinking defaults; undefined fields put nothing on the wire.
  * @param readImage - attachment reader for user and tool-result images; undefined rejects them.
+ * @param maxRequestImageBytes - accumulated base64 image payload this request may carry.
  * @returns the chat-completions request body.
  */
 export async function serializeRequest(
   options: GenerateOptions,
   defaults: RequestDefaults = {},
   readImage?: WireImageReader,
+  maxRequestImageBytes = DEFAULT_MAX_REQUEST_IMAGE_BYTES,
 ): Promise<WireRequest> {
   const messages: WireMessage[] = []
   if (options.system !== undefined) {
     messages.push({ role: 'system', content: options.system })
   }
-  messages.push(...await serializeMessages(options.messages, readImage))
+  messages.push(...await serializeMessages(options.messages, readImage, maxRequestImageBytes))
 
   const tools: WireTool[] | undefined = options.tools?.map(tool => ({
     type: 'function',
