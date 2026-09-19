@@ -14,7 +14,7 @@ on:
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
   push:
-    branches: [master]
+    branches: [main, master]
     paths:
       - '.github/workflows/landlock-run.yml'
       - '.github/workflows/landlock-run-release.yml'
@@ -47,7 +47,7 @@ jobs:
     outputs:
       ci: ${{ steps.matrix.outputs.ci }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - id: matrix
         run: echo "ci=$(node ./scripts/github-matrix.mjs ci)" >> "$GITHUB_OUTPUT"
@@ -60,13 +60,13 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.matrix.outputs.ci) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: package.json
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
@@ -111,13 +111,13 @@ jobs:
     name: darwin (no platform package — degradation proof)
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: package.json
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm

@@ -36,7 +36,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
@@ -107,7 +107,7 @@ jobs:
           tar czf dist/meshfin-linux-x64.tar.gz -C dist meshfin-linux-x64
           (cd dist && zip -qr meshfin-windows-x64.zip meshfin-windows-x64)
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: portable-archives
           path: |
@@ -124,7 +124,7 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 30
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: portable-archives
           path: artifacts
@@ -199,7 +199,7 @@ jobs:
           "$aapt2" dump badging apps/android-shell/app/build/outputs/apk/debug/app-debug.apk \
             | grep -E 'application-label|package: name'
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: android-shell
           path: apps/android-shell/app/build/outputs/apk/debug/app-debug.apk
@@ -213,7 +213,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
 

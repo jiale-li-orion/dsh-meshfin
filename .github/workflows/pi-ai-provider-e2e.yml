@@ -30,36 +30,43 @@ jobs:
     name: Azure OpenAI Responses + Anthropic Messages
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: pnpm/action-setup@v4
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: pnpm
-
-      - name: Install (immutable)
-        run: pnpm install --frozen-lockfile
-
-      # The tests self-skip locally when a credential is absent. A manually
-      # dispatched CI run must fail instead of reporting an all-skipped green.
-      - name: Preflight (require provider API keys)
+      # GitHub forbids `secrets` in a job-level `if:`, so the guard is a step:
+      # its output gates every later step in this lane. This deployment runs
+      # keyless by choice, so an unconfigured credential reports a notice and
+      # skips rather than failing the run.
+      - name: Probe for the provider API keys
+        id: keys
         env:
           AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY_EXTERNAL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY_EXTERNAL }}
         run: |
           set -euo pipefail
-          missing=0
-          for name in AZURE_OPENAI_API_KEY ANTHROPIC_API_KEY; do
-            if [ -z "${!name:-}" ]; then
-              echo "::error::${name} is empty. Configure the corresponding *_EXTERNAL repository secret."
-              missing=1
-            fi
-          done
-          exit "$missing"
+          if [ -n "${AZURE_OPENAI_API_KEY:-}" ] && [ -n "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+            echo "Provider keys are configured; running the live provider suite."
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::AZURE_OPENAI_API_KEY_EXTERNAL and/or ANTHROPIC_API_KEY_EXTERNAL are not configured — skipping the provider E2E lane."
+          fi
+
+      - uses: actions/checkout@v6
+        if: steps.keys.outputs.present == 'true'
+
+      - uses: pnpm/action-setup@v6
+        if: steps.keys.outputs.present == 'true'
+
+      - uses: actions/setup-node@v6
+        if: steps.keys.outputs.present == 'true'
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install (immutable)
+        if: steps.keys.outputs.present == 'true'
+        run: pnpm install --frozen-lockfile
 
       - name: E2E tests (real Azure OpenAI and Anthropic APIs)
+        if: steps.keys.outputs.present == 'true'
         env:
           AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY_EXTERNAL }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY_EXTERNAL }}

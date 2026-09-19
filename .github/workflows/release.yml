@@ -10,7 +10,7 @@ name: Release (dsh)
 on:
   pull_request:
   push:
-    branches: [master]
+    branches: [main, master]
   workflow_dispatch:
     inputs:
       publish:
@@ -43,7 +43,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
@@ -99,7 +99,7 @@ jobs:
       - name: Verify packed install
         run: pnpm run release:verify-packed-install --family dsh --from dist/npm --from dist/npm-vendor --from dist/npm-landlock
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: dsh-npm-tarballs
           path: dist/npm/*
@@ -126,7 +126,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           dest: ${{ runner.temp }}/setup-pnpm
 
@@ -138,7 +138,7 @@ jobs:
       - name: Install (immutable, no package scripts)
         run: pnpm install --frozen-lockfile --ignore-scripts
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: dsh-npm-tarballs
           path: dist/npm
