@@ -35,7 +35,7 @@
 
 ## 设计来源
 
-吸收自官方 harness 的 browser use 组及其实验性提供方。保留其独占注册接缝、启动/附着配置与端点校验；官方的"按会话挂载 MCP"需要比本基线更新的 scope API，因此未移植，改为伴生行拥有进程、提供方拥有契约。Chrome DevTools 与 Stagehand 两个后端未移植：前者与 Chrome DevTools MCP 服务端作为普通行已提供的能力重复，后者引入本发行版并不依赖的托管服务。
+吸收自官方 harness 的 browser use 组及其实验性提供方。保留其独占注册接缝、启动/附着配置与端点校验；官方的"按会话挂载 MCP"未移植，改为伴生行拥有进程、提供方拥有契约。本基线其实已具备 agent 级作用域注册（`createScope`、`agent.ctx`），但它的 MCP 客户端对每个 `serverName` 只在进程根上保留一次，所以"每会话一个服务端"需要各自不同的工具命名空间。Chrome DevTools 与 Stagehand 两个后端未移植：前者与 Chrome DevTools MCP 服务端作为普通行已提供的能力重复，后者引入本发行版并不依赖的托管服务。
 
 另见：[`@deepseek-ai/dsh-browser-use`](../../packages/browser-use/browser-use/README.md) 与 [`@deepseek-ai/dsh-browser-use-playwright-mcp`](../../packages/browser-use/browser-use-playwright-mcp/README.md)。
 

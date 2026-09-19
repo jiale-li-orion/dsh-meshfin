@@ -35,7 +35,7 @@ Attaching instead replaces the launch arguments with `--cdp-endpoint <endpoint>`
 
 ## Where the design came from
 
-Absorbed from the official harness's browser-use group and its experimental providers. Their exclusive-registration seam, launch-versus-attach config, and endpoint validation are kept; the official per-Session MCP mounting needs scope APIs newer than this baseline and is not ported, so the companion row owns the process while the provider owns the contract. The Chrome DevTools and Stagehand backends are not ported: the first duplicates what the Chrome DevTools MCP server already offers as a plain row, and the second adds a hosted service this distribution does not depend on.
+Absorbed from the official harness's browser-use group and its experimental providers. Their exclusive-registration seam, launch-versus-attach config, and endpoint validation are kept; the official per-Session MCP mounting is not ported, so the companion row owns the process while the provider owns the contract. This baseline does expose agent-scoped registration (`createScope`, `agent.ctx`), but its MCP client reserves each `serverName` once per process root, so per-Session servers would each need a distinct tool namespace. The Chrome DevTools and Stagehand backends are not ported: the first duplicates what the Chrome DevTools MCP server already offers as a plain row, and the second adds a hosted service this distribution does not depend on.
 
 See also: [`@deepseek-ai/dsh-browser-use`](../../packages/browser-use/browser-use/README.md) and [`@deepseek-ai/dsh-browser-use-playwright-mcp`](../../packages/browser-use/browser-use-playwright-mcp/README.md).
 

@@ -32,4 +32,4 @@ None; this package never assembles model input.
 
 - **One browser backend per composition** — the exclusive slot is the contract, so two backends in one process would need a second composition rather than two providers.
 - **No page-content policy of its own** — what a provider may read, navigate, or submit belongs to that provider and to the deployment's approval policy; this definition deliberately carries none.
-- **No session isolation** — this baseline's tool registry is composition-wide, so the mounted backend's tools serve every Session at once. Per-Session browsers need scope APIs newer than rc.7.
+- **No per-Session browser** — the mounted backend's tools serve every Session at once. One row per Session would need an MCP client that scopes its server namespace to the Session: this baseline's client reserves each `serverName` once per process root, so a second instance using the same namespace fails at load.

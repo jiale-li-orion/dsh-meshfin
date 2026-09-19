@@ -61,7 +61,7 @@ None directly; the browser server's tool schemas ride the tool block the composi
 
 ## Known Limitations and Deferred Work
 
-- **Tools come from the MCP row, not from this provider** — this baseline's MCP client is row-scoped, so one browser serves every Session in the composition. The official experimental group mounts a browser **per Session** with scoped tool masks; that needs scope APIs newer than rc.7 and is not ported.
+- **Tools come from the MCP row, not from this provider** — this baseline's MCP client is row-scoped, so one browser serves every Session in the composition. The official experimental group mounts a browser **per Session** with scoped tool masks; that needs an MCP client whose server namespace is Session-scoped, which this baseline's per-root `serverName` reservation cannot express.
 - **Attachment is exclusive only by configuration** — the seam allows one provider, but nothing stops a second debugging endpoint from being driven outside this composition.
 - **The provider does not install the server or the browser** — the companion row's command and the browser binary belong to the deployment.
 - **One browser per composition** — the seam's exclusive slot is the contract, so parallel Sessions serialize on one browser.
