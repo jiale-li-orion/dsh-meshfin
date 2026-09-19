@@ -26,6 +26,8 @@ The e2e workflow runs keyless: its scheduled and manual lanes replay recorded tr
 
 `ci.yml` now produces its real verdict on direct pushes to `main`, which is how this deployment lands changes; the former pull-request-only gating left that path unverified. The keyless replay cannot detect drift in the live API, so the real-API lane stays available and unclaimed rather than being replaced, and configuring the secret later needs no workflow change.
 
+Three gate inputs exist only outside a clean checkout, and each is now explicit. `scripts/prepare-ci-bubblewrap.sh` fetches its payload through `apt-get download`, because a pinned `archive.ubuntu.com` filename answers 404 once Ubuntu supersedes that revision. The static job passes the pre-push commit as the archive baseline on push events, where the pull-request baseline field is empty. `zod` is listed in `knip.json`'s `ignoreDependencies`, because the generated `lib/typert.*` artifacts import it while `src/` never does, so a checkout with no build output otherwise reads it as unused. `docs/module-graph.md` is regenerated from the workspace, so the module-graph gate fails whenever packages change without it.
+
 The in-house failover mechanism this removed is recorded in the [archived failover runbook](../../archived/process/2026-07-26-ci-failover-runbook.md). The rationale that still applies is the evidence standard in the [larger-hosted-runner decision](2026-07-22-evidence-based-larger-hosted-runners.md) and the cross-platform reference shape in the [serial reference decision](2026-07-21-serial-cross-platform-ci-reference.md); the keyless/real-API split stays under the [real-API e2e decision](../testing/2026-06-19-real-api-e2e-ci.md).
 
 ## Verification

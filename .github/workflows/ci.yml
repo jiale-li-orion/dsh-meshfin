@@ -89,7 +89,10 @@ jobs:
 
       - name: Run static gates
         env:
-          DSH_ARCHIVE_BASE_REF: ${{ github.event.pull_request.base.sha }}
+          # Push events carry no pull_request context, so fall back to the
+          # pre-push commit: an empty baseline makes the archive gate fail with
+          # 'Not a valid object name'.
+          DSH_ARCHIVE_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: pnpm run check:ci:static
 
   node-24-coverage:

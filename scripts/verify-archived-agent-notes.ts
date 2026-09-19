@@ -84,7 +84,10 @@ if (existsSync(manifestPath)) {
 }
 
 // CI supplies its trusted pre-change commit; local writes compare with committed HEAD.
-const baselineRef = process.env.DSH_ARCHIVE_BASE_REF ?? 'HEAD'
+// An empty value means the trigger carried no baseline (a push event read through
+// pull_request fields), not a revision named "": `||` rather than `??` so it falls
+// back instead of failing the gate on `git rev-parse ""`.
+const baselineRef = process.env.DSH_ARCHIVE_BASE_REF || 'HEAD'
 try {
   const baseline = readBaselineManifest(baselineRef)
   errors.push(...validateArchiveManifestExtension(baseline, manifest))
