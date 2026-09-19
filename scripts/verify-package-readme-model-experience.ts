@@ -42,6 +42,8 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
  * blocks. A package moves on or off this list with its context behavior.
  */
 const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
+  'packages/computer-use/computer-use': { kind: 'none', reason: 'The exclusive-registration seam contributes no prompt, tool, schema, or request field.' },
+  'packages/computer-use/computer-use-cua-driver': { kind: 'indirect', reason: 'The provider reserves the slot; the companion MCP client row owns the tool descriptions and results the model sees.' },
   'packages/attachment/attachment': { kind: 'indirect', reason: 'The storage seam delegates model request rendering to provider adapters.' },
   'packages/attachment/attachment-local': { kind: 'indirect', reason: 'The local backend delegates model request rendering to provider adapters.' },
   'packages/shell/shell': { kind: 'indirect', reason: 'The service interface delegates all model rendering to dsh-tool-bash.' },

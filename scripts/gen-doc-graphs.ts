@@ -604,6 +604,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     consumers: ['tool-cordis'],
     note: 'Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport.',
   },
+  {
+    key: 'computerUse',
+    pkg: 'computer-use',
+    title: 'Exclusive computer-use provider registration',
+    mode: 'seam',
+    implementations: ['computer-use-cua-driver'],
+    consumers: ['computer-use-cua-driver'],
+    note: 'One provider per composition reserves the slot until its resources have closed, so a released registration never overlaps a closing desktop session.',
+  },
 ]
 
 function generatedHeader(title: string): string[] {
