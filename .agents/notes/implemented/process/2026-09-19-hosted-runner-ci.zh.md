@@ -26,7 +26,7 @@ E2E 工作流改为无 key 运行：定时与手动泳道通过 `pnpm run test:s
 
 `ci.yml` 现在会在直接 push 到 `main` 时给出真实结论，而这正是本部署落地改动的方式；此前只在 pull request 上运行的门控让这条路径一直没有被验证。无 key 回放无法发现线上 API 的漂移，因此真 API 泳道是保持可用而未被启用，而不是被替换掉；日后配置 secret 不需要改动工作流。
 
-有三项门禁输入只存在于"非干净检出"的环境中，现在都改成了显式写法。`scripts/prepare-ci-bubblewrap.sh` 改用 `apt-get download` 取包，因为一旦 Ubuntu 撤下某个修订版，钉死的 `archive.ubuntu.com` 文件名就会返回 404。静态作业在 push 事件下把推送前的提交作为归档基线，因为此时 pull request 的基线字段是空的。`zod` 被列入 `knip.json` 的 `ignoreDependencies`，因为生成出来的 `lib/typert.*` 产物会 import 它，而 `src/` 从不引用，于是没有构建产物的检出会把它当成未使用。`docs/module-graph.md` 由工作区生成，因此只要改了包而没有重新生成，模块图门禁就会失败。
+有四项门禁输入只存在于"非干净检出"的环境中，现在都做了显式处理。`scripts/prepare-ci-bubblewrap.sh` 改用 `apt-get download` 取包，因为一旦 Ubuntu 撤下某个修订版，钉死的 `archive.ubuntu.com` 文件名就会返回 404。静态作业在 push 事件下把推送前的提交作为归档基线，因为此时 pull request 的基线字段是空的。有六个包声明了 `zod`，实际 import 它的是生成出来的 `lib/typert.*` 产物，`src/` 里没有一处引用，因此只要这些产物不存在，`knip` 就会判它未使用；该门禁因此改到拥有构建的 consumer 泳道运行，而不再放在只处理源平面的静态泳道。`docs/module-graph.md` 由工作区生成，因此只要改了包而没有重新生成，模块图门禁就会失败。
 
 此次移除的自有池故障切换机制记录在[已归档的故障切换手册](../../archived/process/2026-07-26-ci-failover-runbook.md)中。仍然适用的理由依据是[larger 托管运行器决策](2026-07-22-evidence-based-larger-hosted-runners.md)里的证据标准，以及[串行参考决策](2026-07-21-serial-cross-platform-ci-reference.md)里的跨平台参考形态；无 key 与真 API 的分工仍归[真 API e2e 决策](../testing/2026-06-19-real-api-e2e-ci.md)管辖。
 

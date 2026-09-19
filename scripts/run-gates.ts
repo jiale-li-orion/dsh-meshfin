@@ -370,7 +370,6 @@ function ciStaticGates(options: { ownsBuild: boolean }): Gate[] {
       docsBuildScript: 'docs:build:mpa',
     }),
     pnpmScript('module-graph', 'verify-module-graph', { label: 'module graph' }),
-    pnpmScript('knip', 'knip'),
   ]
 }
 
@@ -394,6 +393,10 @@ function ciConsumerGates(): Gate[] {
     pnpmScript('build', 'build'),
     pnpmScript('node-compat', 'check:node-compat', { label: 'Node compatibility' }),
     pnpmScript('publint', 'publint', { needs: builtTree }),
+    // knip resolves each package's declared ./typert face through package.json
+    // exports, and those generated artifacts only exist after the build; without
+    // them the dependency verdict disagrees with the published package.
+    pnpmScript('knip', 'knip', { needs: builtTree }),
     builtPackageInvariantsGate(['publint']),
     pnpmScript('lint-and-duplication', 'check:ci:lint:contracts-ready', {
       label: 'lint and duplication',

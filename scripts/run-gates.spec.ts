@@ -259,19 +259,23 @@ describe('Node 24 lane ownership', () => {
 
     expect(subject.map(item => item.id)).not.toContain('build')
     expect(subject.map(item => item.id)).not.toContain('doc-typecheck')
+    // knip reads the generated ./typert faces through package.json exports, so it
+    // runs in the lane that owns the build instead of the source-only lane.
+    expect(subject.map(item => item.id)).not.toContain('knip')
   })
 
   it('owns the build and orders its artifact consumers', () => {
     const subject = withPnpmEntrypoint(() => gatesForMode('ci-consumers'))
 
     expect(defaultConcurrency('ci-consumers', subject.length, 4)).toEqual({
-      workers: 10,
+      workers: 11,
       source: 'ci-consumers gate count',
     })
     expect(subject.map(item => item.id)).toEqual([
       'build',
       'node-compat',
       'publint',
+      'knip',
       'built-package-invariants',
       'lint-and-duplication',
       'snapshot',
@@ -281,6 +285,7 @@ describe('Node 24 lane ownership', () => {
       'built-bin-smoke',
     ])
     expect(subject.find(item => item.id === 'publint')?.needs).toEqual(['build'])
+    expect(subject.find(item => item.id === 'knip')?.needs).toEqual(['build'])
     expect(subject.find(item => item.id === 'built-package-invariants')?.needs).toEqual(['publint'])
     expect(subject.find(item => item.id === 'lint-and-duplication')?.needs).toEqual(['built-package-invariants'])
     for (const id of [
