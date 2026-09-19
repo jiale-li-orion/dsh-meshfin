@@ -207,6 +207,9 @@ flowchart LR
   pkg_cordis_host_runner["cordis-host-runner"]
   svc_dynamicCordisRunner["ctx.dynamicCordisRunner<br/>Dynamic Cordis package host runner"]
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
+  pkg_browser_use["browser-use"]
+  svc_browserUse["ctx.browserUse<br/>Exclusive browser-use provider registration"]
+  pkg_browser_use_playwright_mcp["browser-use-playwright-mcp"]
   pkg_computer_use["computer-use"]
   svc_computerUse["ctx.computerUse<br/>Exclusive computer-use provider registration"]
   pkg_computer_use_cua_driver["computer-use-cua-driver"]
@@ -222,6 +225,8 @@ flowchart LR
   pkg_attachment_local --> svc_attachments
   pkg_bash_local --> svc_shell
   pkg_bash_sandbox --> svc_shell
+  pkg_browser_use --> svc_browserUse
+  pkg_browser_use_playwright_mcp --> svc_browserUse
   pkg_code_runtime --> svc_codeRuntime
   pkg_code_runtime_worker --> svc_codeRuntime
   pkg_commands --> svc_commands
@@ -331,6 +336,7 @@ flowchart LR
   svc_approval --> pkg_tools
   svc_attachments --> pkg_host_runtime
   svc_attachments --> pkg_llm_pi_ai
+  svc_browserUse --> pkg_browser_use_playwright_mcp
   svc_clientModules --> pkg_hmr
   svc_codeRuntime --> pkg_tools
   svc_compaction --> pkg_compaction_basic
@@ -503,6 +509,7 @@ flowchart LR
 | `ctx.apiProxy` | `core` | `apiproxy` | - | `connection` | - | 与传输无关的 Host 网关接口：它分派浏览器 API 调用，每条打开的 Host 流自行订阅转发事件，而不是由广播方法向其推送。 |
 | `ctx.dynamicCordisRunner` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | 拥有内存定义注册表、Host 半的 vm 沙箱和 request-run 往返流程；浏览器页面通过其 Remote 命名空间在线访问同一服务。 |
 | `ctx.cordisInspect` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | 注册 Host inspect 提供方、镜像 Client 提供方 manifest，并通过动态 Cordis 传输路由 Client 查询。 |
-| `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`computer-use-cua-driver`](../packages/computer-use/computer-use-cua-driver) | [`computer-use-cua-driver`](../packages/computer-use/computer-use-cua-driver) | - | One provider per composition reserves the slot until its resources have closed, so a released registration never overlaps a closing desktop session. |
+| `ctx.browserUse` | `seam` | [`browser-use`](../packages/browser-use/browser-use) | [`browser-use-playwright-mcp`](../packages/browser-use/browser-use-playwright-mcp) | [`browser-use-playwright-mcp`](../packages/browser-use/browser-use-playwright-mcp) | - | 每个组合一个提供方占用该名额，直到它的浏览器工作结算完毕，因此释放后的注册永远不会与仍在关闭的浏览器重叠。 |
+| `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`computer-use-cua-driver`](../packages/computer-use/computer-use-cua-driver) | [`computer-use-cua-driver`](../packages/computer-use/computer-use-cua-driver) | - | 每个组合一个提供方占用该名额，直到它的资源关闭完毕，因此释放后的注册永远不会与仍在关闭的桌面会话重叠。 |
 
 维护模式：混合模式。服务从 Cordis 声明中发现；接口、实现和消费方角色在 `scripts/gen-doc-graphs.ts` 中分类，并设有完整性守卫。

@@ -269,6 +269,8 @@
     { "path": "./packages/subagent/subagent-dsh-sdk" },
     { "path": "./packages/computer-use/computer-use" },
     { "path": "./packages/computer-use/computer-use-cua-driver" },
+    { "path": "./packages/browser-use/browser-use" },
+    { "path": "./packages/browser-use/browser-use-playwright-mcp" },
     { "path": "./packages/jobs/jobs" },
     { "path": "./packages/jobs/jobs-local" },
     { "path": "./packages/jobs/tool-jobs" },

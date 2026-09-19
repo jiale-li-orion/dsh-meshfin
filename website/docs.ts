@@ -307,6 +307,7 @@ const subsystemGroups = [
     ['web-server.md', 'HTTP 服务器', 'HTTP server'],
     ['workbench.md', '工作台', 'Workbench'],
     ['computer-use.md', '计算机操作', 'Computer use'],
+    ['browser-use.md', '浏览器操作', 'Browser use'],
     ['plugin-catalog.md', '插件目录', 'Plugin catalog'],
     ['typert.md', 'Typert', 'Typert'],
     ['client-modules.md', '客户端模块', 'Client modules'],

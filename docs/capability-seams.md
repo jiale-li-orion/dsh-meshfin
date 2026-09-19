@@ -205,6 +205,9 @@ flowchart LR
   pkg_cordis_host_runner["cordis-host-runner"]
   svc_dynamicCordisRunner["ctx.dynamicCordisRunner<br/>Dynamic Cordis package host runner"]
   svc_cordisInspect["ctx.cordisInspect<br/>Dynamic Cordis inspect registry"]
+  pkg_browser_use["browser-use"]
+  svc_browserUse["ctx.browserUse<br/>Exclusive browser-use provider registration"]
+  pkg_browser_use_playwright_mcp["browser-use-playwright-mcp"]
   pkg_computer_use["computer-use"]
   svc_computerUse["ctx.computerUse<br/>Exclusive computer-use provider registration"]
   pkg_computer_use_cua_driver["computer-use-cua-driver"]
@@ -220,6 +223,8 @@ flowchart LR
   pkg_attachment_local --> svc_attachments
   pkg_bash_local --> svc_shell
   pkg_bash_sandbox --> svc_shell
+  pkg_browser_use --> svc_browserUse
+  pkg_browser_use_playwright_mcp --> svc_browserUse
   pkg_code_runtime --> svc_codeRuntime
   pkg_code_runtime_worker --> svc_codeRuntime
   pkg_commands --> svc_commands
@@ -329,6 +334,7 @@ flowchart LR
   svc_approval --> pkg_tools
   svc_attachments --> pkg_host_runtime
   svc_attachments --> pkg_llm_pi_ai
+  svc_browserUse --> pkg_browser_use_playwright_mcp
   svc_clientModules --> pkg_hmr
   svc_codeRuntime --> pkg_tools
   svc_compaction --> pkg_compaction_basic
@@ -501,6 +507,7 @@ flowchart LR
 | `ctx.apiProxy` | `core` | `apiproxy` | - | `connection` | - | The transport-agnostic host gateway face: it dispatches browser API calls, and each open host stream subscribes to the events it forwards rather than being pushed to through a broadcast verb. |
 | `ctx.dynamicCordisRunner` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Owns the in-memory definition registry, the vm sandbox for host halves, and the request-run round trip; browser pages reach the same service over the wire through its remote namespace. |
 | `ctx.cordisInspect` | `core` | [`cordis-host-runner`](../packages/extensions/cordis-host-runner) | - | [`tool-cordis`](../packages/extensions/tool-cordis) | - | Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport. |
+| `ctx.browserUse` | `seam` | [`browser-use`](../packages/browser-use/browser-use) | [`browser-use-playwright-mcp`](../packages/browser-use/browser-use-playwright-mcp) | [`browser-use-playwright-mcp`](../packages/browser-use/browser-use-playwright-mcp) | - | One provider per composition reserves the slot until its browser work has settled, so a released registration never overlaps a browser that is still shutting down. |
 | `ctx.computerUse` | `seam` | [`computer-use`](../packages/computer-use/computer-use) | [`computer-use-cua-driver`](../packages/computer-use/computer-use-cua-driver) | [`computer-use-cua-driver`](../packages/computer-use/computer-use-cua-driver) | - | One provider per composition reserves the slot until its resources have closed, so a released registration never overlaps a closing desktop session. |
 
 Maintenance mode: hybrid: services are discovered from Cordis declarations; interface/implementation/consumer roles are classified in `scripts/gen-doc-graphs.ts` with a completeness guard.

@@ -605,6 +605,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Registers host inspect providers, mirrors the client provider manifest, and routes client queries through the dynamic Cordis transport.',
   },
   {
+    key: 'browserUse',
+    pkg: 'browser-use',
+    title: 'Exclusive browser-use provider registration',
+    mode: 'seam',
+    implementations: ['browser-use-playwright-mcp'],
+    consumers: ['browser-use-playwright-mcp'],
+    note: 'One provider per composition reserves the slot until its browser work has settled, so a released registration never overlaps a browser that is still shutting down.',
+  },
+  {
     key: 'computerUse',
     pkg: 'computer-use',
     title: 'Exclusive computer-use provider registration',

@@ -389,6 +389,41 @@ Depends on: [`LocalConfig`](#deepseek-aidsh-bash-local)
 
 Source: [`packages/shell/bash-sandbox/src/index.ts:35`](../packages/shell/bash-sandbox/src/index.ts)
 
+<a id="deepseek-aidsh-browser-use-playwright-mcp"></a>
+
+## `@deepseek-ai/dsh-browser-use-playwright-mcp`
+
+Requires: `browserUse`
+
+```ts config-catalog
+/** Browser launch or attachment choice. */
+export type Config = LaunchConfig | AttachConfig
+
+/** Launch a browser this provider owns for the whole composition. */
+export interface LaunchConfig {
+  /** Selects a newly launched isolated browser. */
+  mode: 'launch'
+  /** Whether the browser runs without a visible window; defaults to true. */
+  headless?: boolean
+  /** Browser executable; omission uses the server's own installation discovery. */
+  executablePath?: string
+  /** Per-call timeout override in milliseconds; omission uses the MCP client default. */
+  toolCallTimeoutMs?: number
+}
+
+/** Attach to a browser this provider does not own. */
+export interface AttachConfig {
+  /** Selects an existing debugging endpoint. */
+  mode: 'attach'
+  /** HTTP(S) debugging URL or WS(S) browser debugging endpoint. */
+  endpoint: string
+  /** Per-call timeout override in milliseconds; omission uses the MCP client default. */
+  toolCallTimeoutMs?: number
+}
+```
+
+Source: [`packages/browser-use/browser-use-playwright-mcp/src/index.ts:56`](../packages/browser-use/browser-use-playwright-mcp/src/index.ts)
+
 <a id="deepseek-aidsh-client-connection"></a>
 
 ## `@deepseek-ai/dsh-client-connection`
@@ -3188,6 +3223,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-agent` ([`packages/core/agent/src/index.ts`](../packages/core/agent/src/index.ts))
 - `@deepseek-ai/dsh-api-gateway` — requires `typert` ([`packages/api/gateway/src/index.ts`](../packages/api/gateway/src/index.ts))
 - `@deepseek-ai/dsh-api-remotes` ([`packages/api/remotes/src/index.ts`](../packages/api/remotes/src/index.ts))
+- `@deepseek-ai/dsh-browser-use` ([`packages/browser-use/browser-use/src/index.ts`](../packages/browser-use/browser-use/src/index.ts))
 - `@deepseek-ai/dsh-client-locale` ([`packages/client/locale/src/index.ts`](../packages/client/locale/src/index.ts))
 - `@deepseek-ai/dsh-client-modules` — requires `webServer` · `loader` ([`packages/client/modules/src/index.ts`](../packages/client/modules/src/index.ts))
 - `@deepseek-ai/dsh-client-origin` — requires `agents` ([`packages/context/client-origin/src/index.ts`](../packages/context/client-origin/src/index.ts))

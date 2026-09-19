@@ -50,6 +50,7 @@ export { REGION_BEGIN, REGION_END }
  * errors, so the partition can never silently drift from the service API.
  */
 export const SERVICE_PAGE: Record<string, string> = {
+  browserUse: 'browser-use.md',
   computerUse: 'computer-use.md',
   agentLoop: 'core.md',
   agentDefaultModel: 'core.md',
@@ -546,6 +547,7 @@ export const TYPE_LINK_EXEMPTIONS: Readonly<Record<string, string>> = {
   PluginCatalogQuery: 'catalog query vocabulary is owned by packages/workbench/plugin-catalog/README.md',
   PluginCatalogPage: 'catalog page vocabulary is owned by packages/workbench/plugin-catalog/README.md',
   PluginInstallResult: 'install result vocabulary is owned by packages/workbench/plugin-install/README.md',
+  BrowserUseProviderName: 'browser-use provider identity is owned by docs/subsystems/browser-use.md',
   ComputerUseProviderName: 'computer-use provider identity is owned by docs/subsystems/computer-use.md',
   PluginSkinRow: 'appearance-row vocabulary is owned by packages/workbench/plugin-install/README.md',
   PluginSkinToggle: 'appearance-row vocabulary is owned by packages/workbench/plugin-install/README.md',

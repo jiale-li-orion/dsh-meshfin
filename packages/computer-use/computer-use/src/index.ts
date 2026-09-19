@@ -11,9 +11,6 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { ComputerUseProviderName } from './brand.ts'
 
-export type { ComputerUseProviderName } from './brand.ts'
-export { ComputerUseProviderName as brandProviderName } from './brand.ts'
-
 declare module '@deepseek-ai/cordis' {
   interface Context {
     /** The one computer-use provider this composition mounted, if any. */

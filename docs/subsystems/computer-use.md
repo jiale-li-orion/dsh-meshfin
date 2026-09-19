@@ -60,5 +60,5 @@ Owns the single optional provider registration of the computer-use capability.
 register(name: ComputerUseProviderName): () => Promise<void>
 ```
 
-Source: [`packages/computer-use/computer-use/src/index.ts:25`](../../packages/computer-use/computer-use/src/index.ts)
+Source: [`packages/computer-use/computer-use/src/index.ts:22`](../../packages/computer-use/computer-use/src/index.ts)
 <!-- END GENERATED cordis-surface -->
