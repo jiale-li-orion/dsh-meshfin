@@ -2464,7 +2464,7 @@ export interface Config {
 }
 ```
 
-来源：[`packages/context/time-context/src/index.ts:27`](../packages/context/time-context/src/index.ts)
+来源：[`packages/context/time-context/src/index.ts:26`](../packages/context/time-context/src/index.ts)
 
 <a id="deepseek-aidsh-tmux-context"></a>
 
