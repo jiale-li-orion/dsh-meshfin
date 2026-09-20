@@ -15,6 +15,9 @@ import {
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
+/** Cramped-column width inside the desktop frame; below 1024 the mobile frame replaces it. */
+const NARROW_VIEWPORT_WIDTH = 1040
+
 const MODE = webSnapshotMode()
 const OVERLAY = fileURLToPath(new URL('./produced-files.overlay.yml', import.meta.url))
 const SEED_ID = 'produced-files-web-e2e'
@@ -137,14 +140,23 @@ describe('web e2e: a finished turn ends with the files it produced', () => {
     await sessionRow.click()
 
     await expect.poll(() => page.getByText(DONE, { exact: true }).count(), { timeout: 15_000 }).toBe(1)
-    await page.setViewportSize({ width: 780, height: 900 })
+    // Cramped-column leg inside the desktop frame: the row degrades to two chips
+    // plus the overflow summary only while the column is narrow, and below 1024
+    // the mobile frame widens it again.
+    await page.setViewportSize({ width: NARROW_VIEWPORT_WIDTH, height: 900 })
     const row = page.locator('[data-produced-files-row]')
     await row.waitFor({ timeout: 15_000 })
     const chips = row.getByRole('button')
-    await expect.poll(() => chips.count()).toBe(2)
+    // How many chips fit depends on font metrics, and the column is wider than it
+    // was when this pinned two: the contract is that the row still degrades (the
+    // first files stay visible, the rest are counted exactly) and stays on one
+    // line, not one particular fit number.
+    await expect.poll(() => chips.count(), { timeout: 15_000 }).toBeGreaterThanOrEqual(2)
     expect(await chips.nth(0).innerText()).toBe('关于我.md')
     expect(await chips.nth(1).innerText()).toBe('index.html')
-    expect(await row.getByText('+ 8 files', { exact: true }).count()).toBe(1)
+    const shown = await chips.count()
+    expect(shown).toBeLessThan(PRODUCED.length)
+    expect(await row.getByText(`+ ${String(PRODUCED.length - shown)} files`, { exact: true }).count()).toBe(1)
     const showFolder = page.getByRole('button', { name: 'Show in folder', exact: true })
     expect(await showFolder.count()).toBe(1)
     expect(await page.getByText('Produced', { exact: true }).count()).toBe(1)

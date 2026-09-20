@@ -77,16 +77,25 @@ const FIXTURE = createChatScrollFixture({
 })
 const SEED_ID = 'composer-tab-geometry-web-e2e'
 
-/** Viewport widths the scenario measures at: the card capped, and the card shrinking with the column. */
+/**
+ * Viewport widths the scenario measures at: the card capped, and the card
+ * shrinking with the column. The narrow leg stays above the frame boundary: at
+ * or above 1024 the frame is still the four-track desktop frame with a collapsed
+ * sidebar, while below it the app renders its mobile frame, which has no
+ * composer column to measure.
+ */
 const WIDE_VIEWPORT = { width: 1680, height: 1000 }
-const NARROW_VIEWPORT = { width: 800, height: 1000 }
+const FRAME_MIN_WIDTH = 1024
+const NARROW_VIEWPORT = { width: FRAME_MIN_WIDTH + 16, height: 1000 }
 
 /**
  * Resize to one measurement viewport after the responsive sidebar and center
  * column finish their track transition.
  * @param page - the page under test.
  * @param viewport - the viewport dimensions to apply.
- * @param sidebarCollapsed - the sidebar state expected at this width.
+ * @param sidebarCollapsed - the sidebar state expected at this width; the narrow
+ * leg keeps it expanded, because the sidebar only auto-collapses below the frame
+ * boundary and that width now renders the mobile frame instead.
  */
 async function setMeasuredViewport(
   page: Page,
@@ -372,7 +381,7 @@ describe('web e2e: input card position across view tabs', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-composer-tab-geometry-narrow'))
     await setMeasuredViewport(page, WIDE_VIEWPORT, false)
     const capped = await measureTab(page)
-    await setMeasuredViewport(page, NARROW_VIEWPORT, true)
+    await setMeasuredViewport(page, NARROW_VIEWPORT, false)
     const comparison = await compareTabs(page)
     // The other geometry, and a different failure: below the cap the card takes
     // the column's width, so an unreserved gutter changes its WIDTH by the whole
@@ -412,7 +421,7 @@ describe('web e2e: input card position across view tabs', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-composer-tab-geometry-golden'))
     await setMeasuredViewport(page, WIDE_VIEWPORT, false)
     const wide = await compareTabs(page)
-    await setMeasuredViewport(page, NARROW_VIEWPORT, true)
+    await setMeasuredViewport(page, NARROW_VIEWPORT, false)
     const narrow = await compareTabs(page)
     await setMeasuredViewport(page, WIDE_VIEWPORT, false)
     const control = await compareTabsWithoutCompensation(page)

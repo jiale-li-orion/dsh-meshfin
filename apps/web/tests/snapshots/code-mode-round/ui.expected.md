@@ -18,6 +18,10 @@
   - img
   - img
   - text: Context injection @deepseek-ai/dsh-system-prompt
+- button "Context injection client-origin":
+  - img
+  - img
+  - text: Context injection client-origin
 - 'button "Think The user wants me to write a single `run_code` program that:"':
   - img
   - img
@@ -49,6 +53,7 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Upload a file"
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

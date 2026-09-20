@@ -28,6 +28,9 @@ const COMPOSED_EXPECTED = join(SNAPSHOT_DIR, 'composed.expected.md')
 // Final golden: the answered transcript — the question resolved into its tool
 // round trip and the final reply, the state the composer goldens cannot see.
 const ANSWERED_EXPECTED = join(SNAPSHOT_DIR, 'answered.expected.md')
+/** Cramped-column width inside the desktop frame; below 1024 the mobile frame replaces it. */
+const NARROW_VIEWPORT_WIDTH = 1040
+
 const MODE = webSnapshotMode()
 
 // The options carry long descriptions on purpose: the squeeze assertion below
@@ -100,7 +103,10 @@ describe('web e2e: resident question composer round trip', () => {
     if (MODE !== 'record') {
       const original = page.viewportSize() ?? { width: 1680, height: 1000 }
       for (const height of [520, 440, 380]) {
-        await page.setViewportSize({ width: 900, height })
+        // The width stays inside the desktop frame: the squeeze comes from the
+        // seat height, and below 1024 the mobile frame replaces the capped card
+        // with a full-height one, so no row ever overflows to wrap.
+        await page.setViewportSize({ width: NARROW_VIEWPORT_WIDTH, height })
         const squeeze = await composer.evaluate((card) => {
           // Role/ARIA selectors, not the CSS-module class names: the built
           // client hashes those.

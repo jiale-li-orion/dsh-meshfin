@@ -22,6 +22,10 @@
   - img
   - img
   - text: Context injection user-invoke-demo
+- button "Context injection client-origin":
+  - img
+  - img
+  - text: Context injection client-origin
 - paragraph: USER_INVOKE_REPLY acknowledged; following the injected skill.
 - button "Copy":
   - img
@@ -36,6 +40,7 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Upload a file"
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

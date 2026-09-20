@@ -18,6 +18,10 @@
   - img
   - img
   - text: Context injection @deepseek-ai/dsh-system-prompt
+- button "Context injection client-origin":
+  - img
+  - img
+  - text: Context injection client-origin
 - status:
   - text: This turn failedAPI key is invalid
   - code: AUTH
@@ -25,6 +29,7 @@
 - button "Commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
+- button "Upload a file"
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img

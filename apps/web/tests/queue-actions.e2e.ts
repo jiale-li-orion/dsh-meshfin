@@ -25,6 +25,9 @@ const EDITING_EXPECTED = join(SNAPSHOT_DIR, 'editing.expected.md')
 const LAYOUT_EXPECTED = join(SNAPSHOT_DIR, 'layout.expected.md')
 const PRESERVED_EXPECTED = join(SNAPSHOT_DIR, 'preserved.expected.md')
 const UI_EXPECTED = join(SNAPSHOT_DIR, 'ui.expected.md')
+/** Cramped-column width inside the desktop frame; below 1024 the mobile frame replaces it. */
+const NARROW_VIEWPORT_WIDTH = 1040
+
 const MODE = webSnapshotMode()
 
 const ACTIVE_PROMPT = 'Reply with a one-sentence description of event sourcing, then stop.'
@@ -111,7 +114,10 @@ describe('web e2e: queue row actions', () => {
       { timeout: 10_000 },
     ).toBe(2)
 
-    await page.setViewportSize({ width: 640, height: 1000 })
+    // The cramped-column leg stays above the frame boundary: below 1024 the app
+    // renders its mobile frame, which keeps one page at a time and has no
+    // composer card beside the dock to measure.
+    await page.setViewportSize({ width: NARROW_VIEWPORT_WIDTH, height: 1000 })
     const queueBox = await page.locator('[data-queue-dock]').boundingBox()
     const composerBox = await page.locator('[data-composer-card]').boundingBox()
     expect(queueBox).not.toBeNull()
@@ -243,7 +249,7 @@ describe('web e2e: queue row actions', () => {
       expect(todoBox!.width).toBeCloseTo(queuePanelBox!.width, 1)
     }
     await expectAlignedContextPanels()
-    await page.setViewportSize({ width: 640, height: 1000 })
+    await page.setViewportSize({ width: NARROW_VIEWPORT_WIDTH, height: 1000 })
     await expectAlignedContextPanels()
     await page.setViewportSize({ width: 1680, height: 1000 })
 

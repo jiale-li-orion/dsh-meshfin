@@ -22,6 +22,9 @@ import {
 } from './scaffold.ts'
 import { newEnglishPage, saveFailureShot } from './support.ts'
 
+/** Cramped-column width inside the desktop frame; below 1024 the mobile frame replaces it. */
+const NARROW_VIEWPORT_WIDTH = 1040
+
 const MODE = webSnapshotMode()
 const HISTORY_SESSION_ID = 'chat-scroll-history-e2e'
 const TOOL_SESSION_ID = 'chat-scroll-tool-e2e'
@@ -656,10 +659,11 @@ describe('web e2e: long Chat scroll contract', () => {
 
       await world.page.getByRole('tab', { name: 'Trajectory', exact: true }).click()
       await world.page.getByLabel('Trajectory timeline').waitFor({ timeout: 30_000 })
-      await world.page.setViewportSize({ width: 700, height: 900 })
-      // The narrow breakpoint auto-collapses the sidebar. Re-open it because
-      // this scenario switches sessions while pinning the narrow Chat scroll owner.
-      await world.page.getByRole('button', { name: 'Open sidebar', exact: true }).click()
+      // The narrow leg stays above the frame boundary: at or above 1024 the frame
+      // is still the desktop frame with its sidebar, while below it the app
+      // renders its mobile frame, whose one-page-at-a-time navigation has no
+      // sidebar to re-open and no side-by-side scroll owner to pin.
+      await world.page.setViewportSize({ width: NARROW_VIEWPORT_WIDTH, height: 900 })
       await world.page.getByRole('tab', { name: 'Chat', exact: true }).click()
       await nextPaint(world.page)
       await expectSameFlowTop(world.page, sessionAnchor)

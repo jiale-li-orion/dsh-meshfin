@@ -32,6 +32,9 @@ const FIXTURE = join(SNAPSHOT_DIR, 'session.jsonl')
 // The scenario's one golden: the waiting panel. Everything the answered state
 // proves is asserted directly — see the world-state block at the end.
 const UI_EXPECTED = join(SNAPSHOT_DIR, 'ui.expected.md')
+/** Cramped-column width inside the desktop frame; below 1024 the mobile frame replaces it. */
+const NARROW_VIEWPORT_WIDTH = 1040
+
 const MODE = webSnapshotMode()
 
 // Irreducible payload: the command has to be long enough to pass the card's
@@ -119,7 +122,10 @@ describe('web e2e: approval takeover keeps its actions reachable', () => {
       // baseline and at a short viewport, on the live panel.
       const original = page.viewportSize() ?? { width: 1680, height: 1000 }
       for (const height of [1000, 700]) {
-        await page.setViewportSize({ width: 900, height })
+        // The width stays inside the desktop frame: the cap this measures belongs
+        // to the panel's seat beside the composer, and below 1024 the mobile
+        // frame replaces that layout with a full-height one.
+        await page.setViewportSize({ width: NARROW_VIEWPORT_WIDTH, height })
         const geometry = await panel.evaluate((root) => {
           const region = root.querySelector<HTMLElement>('[data-approval-scroll]')
           const card = region?.parentElement ?? null

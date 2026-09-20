@@ -26,5 +26,6 @@
 - button "Commands" [disabled]:
   - img
 - 'button "Access mode, current: Custom" [disabled]': Custom
+- button "Upload a file"
 - button "Stop generating"
 - button "Send message" [disabled]
