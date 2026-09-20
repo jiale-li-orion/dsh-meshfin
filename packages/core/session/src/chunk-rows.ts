@@ -285,10 +285,7 @@ export function* chunkRowValues(
   from = 0,
   to = chunkRowLength(row),
 ): Generator<SessionEvent<'assistant/chunk'>> {
-  const length = chunkRowLength(row)
-  if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || from > to || to > length) {
-    throw new RangeError(`chunk row range [${String(from)}, ${String(to)}) is outside [0, ${String(length)})`)
-  }
+  assertRowRange(row, from, to)
   if (from === to) return
   let time = row.time0
   for (let offset = 1; offset <= from; offset += 1) time += row.data.dt[offset - 1] as number
@@ -310,16 +307,26 @@ export function* reverseChunkRowValues(
   from = 0,
   to = chunkRowLength(row),
 ): Generator<SessionEvent<'assistant/chunk'>> {
-  const length = chunkRowLength(row)
-  if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || from > to || to > length) {
-    throw new RangeError(`chunk row range [${String(from)}, ${String(to)}) is outside [0, ${String(length)})`)
-  }
+  assertRowRange(row, from, to)
   if (from === to) return
   let time = row.time0
   for (let offset = 1; offset < to; offset += 1) time += row.data.dt[offset - 1] as number
   for (let offset = to - 1; offset >= from; offset -= 1) {
     yield rowMember(row, offset, time)
     if (offset > from) time -= row.data.dt[offset - 1] as number
+  }
+}
+
+/**
+ * Reject a half-open member range that is not a safe integer subrange of `row`.
+ * @param row - validated or encoder-produced packed row.
+ * @param from - inclusive lower member offset.
+ * @param to - exclusive upper member offset.
+ */
+function assertRowRange(row: ChunkRow, from: number, to: number): void {
+  const length = chunkRowLength(row)
+  if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from < 0 || from > to || to > length) {
+    throw new RangeError(`chunk row range [${String(from)}, ${String(to)}) is outside [0, ${String(length)})`)
   }
 }
 

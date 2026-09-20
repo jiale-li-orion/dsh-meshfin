@@ -254,14 +254,7 @@ export class PackedSessionLog {
     from = 0,
     to = this.logicalLength,
   ): Generator<SessionEvent<T>> {
-    const lists: Array<{ spans: readonly TypeSpan[]; index: number }> = []
-    const seen = new Set<SessionEventType>()
-    for (const type of types) {
-      if (seen.has(type)) continue
-      seen.add(type)
-      const spans = this.spansByType.get(type)
-      if (spans !== undefined) lists.push({ spans, index: firstSpanAfter(spans, from) })
-    }
+    const lists = this.typeCursors(types, from, 'forward')
 
     for (;;) {
       let selected: { spans: readonly TypeSpan[]; index: number } | undefined
@@ -298,14 +291,7 @@ export class PackedSessionLog {
     from = 0,
     to = this.logicalLength,
   ): Generator<SessionEvent<T>> {
-    const lists: Array<{ spans: readonly TypeSpan[]; index: number }> = []
-    const seen = new Set<SessionEventType>()
-    for (const type of types) {
-      if (seen.has(type)) continue
-      seen.add(type)
-      const spans = this.spansByType.get(type)
-      if (spans !== undefined) lists.push({ spans, index: lastSpanBefore(spans, to) })
-    }
+    const lists = this.typeCursors(types, to, 'reverse')
 
     for (;;) {
       let selected: { spans: readonly TypeSpan[]; index: number } | undefined
@@ -390,6 +376,35 @@ export class PackedSessionLog {
     const tail = spans.at(-1)
     if (tail?.to === from) tail.to = to
     else spans.push({ from, to })
+  }
+
+  /**
+   * Build one merge cursor per requested type, seeding each type's span index
+   * at the first span after the boundary when ascending and at the last span
+   * before it when descending.
+   * @param types - event types to include; duplicates have no effect.
+   * @param boundary - exclusive upper seq when ascending, inclusive upper seq when descending.
+   * @param direction - iteration direction the cursors feed.
+   * @returns a seeded cursor per requested type that has indexed spans.
+   */
+  private typeCursors(
+    types: readonly SessionEventType[],
+    boundary: number,
+    direction: 'forward' | 'reverse',
+  ): Array<{ spans: readonly TypeSpan[]; index: number }> {
+    const lists: Array<{ spans: readonly TypeSpan[]; index: number }> = []
+    const seen = new Set<SessionEventType>()
+    for (const type of types) {
+      if (seen.has(type)) continue
+      seen.add(type)
+      const spans = this.spansByType.get(type)
+      if (spans === undefined) continue
+      lists.push({
+        spans,
+        index: direction === 'forward' ? firstSpanAfter(spans, boundary) : lastSpanBefore(spans, boundary),
+      })
+    }
+    return lists
   }
 
   /** Locate the record whose logical range contains `seq`. */

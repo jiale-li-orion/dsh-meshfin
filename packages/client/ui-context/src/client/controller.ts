@@ -428,11 +428,7 @@ export class SessionContextController implements HostObservable<ContextControlle
         recursive: true,
         ...more && previous?.nextCursor !== undefined ? { cursor: previous.nextCursor } : {},
       }, abort.signal)
-      if (!carried.ok) {
-        const failed = remoteFailure(carried.error)
-        this.publish({ ...this.view, error: failed.error.message })
-        return failed
-      }
+      if (!carried.ok) return this.settleRemoteFailure(carried.error)
       const entries = mergeHistoryEntries(more && previous !== undefined
         ? [...previous.entries, ...carried.value.entries]
         : carried.value.entries)
@@ -442,16 +438,9 @@ export class SessionContextController implements HostObservable<ContextControlle
       this.publish({ ...this.view, histories })
       return { ok: true, value }
     } catch (error) {
-      const failed = thrownFailure(error)
-      if (!abort.signal.aborted && !this.disposed) this.publish({ ...this.view, error: failed.error.message })
-      return failed
+      return this.settleThrownFailure(abort.signal, error)
     } finally {
-      if (this.historyAborts.get(checkpointId) === abort) {
-        this.historyAborts.delete(checkpointId)
-        const loading = new Set(this.view.historyLoading)
-        loading.delete(checkpointId)
-        this.publish({ ...this.view, historyLoading: loading })
-      }
+      this.releaseCheckpointOperation(this.historyAborts, checkpointId, abort, 'historyLoading')
     }
   }
 
@@ -487,11 +476,7 @@ export class SessionContextController implements HostObservable<ContextControlle
         recursive: true,
         ...more && previous?.nextCursor !== undefined ? { cursor: previous.nextCursor } : {},
       }, abort.signal)
-      if (!carried.ok) {
-        const failed = remoteFailure(carried.error)
-        this.publish({ ...this.view, error: failed.error.message })
-        return failed
-      }
+      if (!carried.ok) return this.settleRemoteFailure(carried.error)
       const value = more && previous !== undefined
         ? { ...carried.value, matches: [...previous.matches, ...carried.value.matches] }
         : carried.value
@@ -501,16 +486,9 @@ export class SessionContextController implements HostObservable<ContextControlle
       this.publish({ ...this.view, searches })
       return { ok: true, value }
     } catch (error) {
-      const failed = thrownFailure(error)
-      if (!abort.signal.aborted && !this.disposed) this.publish({ ...this.view, error: failed.error.message })
-      return failed
+      return this.settleThrownFailure(abort.signal, error)
     } finally {
-      if (this.searchAborts.get(checkpointId) === abort) {
-        this.searchAborts.delete(checkpointId)
-        const loading = new Set(this.view.searchLoading)
-        loading.delete(checkpointId)
-        this.publish({ ...this.view, searchLoading: loading })
-      }
+      this.releaseCheckpointOperation(this.searchAborts, checkpointId, abort, 'searchLoading')
     }
   }
 
@@ -625,6 +603,53 @@ export class SessionContextController implements HostObservable<ContextControlle
     }
   }
 
+  /**
+   * Publish one Remote carrier failure as the view error and settle it.
+   * @param error - the carrier failure carried by the result union.
+   * @returns the settled UI failure.
+   */
+  private settleRemoteFailure(error: { code: string; message: string }): ContextFailure {
+    const failed = remoteFailure(error)
+    this.publish({ ...this.view, error: failed.error.message })
+    return failed
+  }
+
+  /**
+   * Settle one rejected Remote call, publishing it as the view error unless its
+   * signal was aborted or the controller was disposed.
+   * @param signal - the operation's abort signal.
+   * @param error - the rejected value.
+   * @returns the settled UI failure.
+   */
+  private settleThrownFailure(signal: AbortSignal, error: unknown): ContextFailure {
+    const failed = thrownFailure(error)
+    if (!signal.aborted && !this.disposed) this.publish({ ...this.view, error: failed.error.message })
+    return failed
+  }
+
+  /**
+   * Release one settled paged checkpoint operation: drop its abort slot and
+   * clear its loading flag. A superseded operation publishes nothing.
+   * @param aborts - registry of in-flight aborts for this operation's checkpoints.
+   * @param checkpointId - checkpoint the operation addressed.
+   * @param abort - the operation's own controller.
+   * @param loadingKey - the view flag naming this operation's in-flight checkpoints.
+   */
+  private releaseCheckpointOperation(
+    aborts: Map<ContextHistoryReadRequest['checkpointId'], AbortController>,
+    checkpointId: ContextHistoryReadRequest['checkpointId'],
+    abort: AbortController,
+    loadingKey: 'historyLoading' | 'searchLoading',
+  ): void {
+    if (aborts.get(checkpointId) !== abort) return
+    aborts.delete(checkpointId)
+    const loading = new Set(this.view[loadingKey])
+    loading.delete(checkpointId)
+    this.publish(loadingKey === 'historyLoading'
+      ? { ...this.view, historyLoading: loading }
+      : { ...this.view, searchLoading: loading })
+  }
+
   private async commitRewrite(
     request: { unitId: ContextUnitId; text: string; mode: ContextRewriteMode; continue: boolean },
     expectedTailSeq: number,
@@ -635,18 +660,12 @@ export class SessionContextController implements HostObservable<ContextControlle
         ...request,
         expectedTailSeq,
       }, signal)
-      if (!carried.ok) {
-        const failed = remoteFailure(carried.error)
-        this.publish({ ...this.view, error: failed.error.message })
-        return failed
-      }
+      if (!carried.ok) return this.settleRemoteFailure(carried.error)
       this.publish({ ...this.view, lastRewrite: carried.value, error: null })
       if (this.activeReaders > 0) await this.refresh()
       return { ok: true, value: carried.value }
     } catch (error) {
-      const failed = thrownFailure(error)
-      if (!signal.aborted && !this.disposed) this.publish({ ...this.view, error: failed.error.message })
-      return failed
+      return this.settleThrownFailure(signal, error)
     }
   }
 
@@ -664,17 +683,11 @@ export class SessionContextController implements HostObservable<ContextControlle
     const pending = (async (): Promise<ContextActionResult<T>> => {
       try {
         const carried = await operation(abort.signal)
-        if (!carried.ok) {
-          const failed = remoteFailure(carried.error)
-          this.publish({ ...this.view, error: failed.error.message })
-          return failed
-        }
+        if (!carried.ok) return this.settleRemoteFailure(carried.error)
         if (this.activeReaders > 0) await this.refresh()
         return { ok: true, value: carried.value }
       } catch (error) {
-        const failed = thrownFailure(error)
-        if (!abort.signal.aborted && !this.disposed) this.publish({ ...this.view, error: failed.error.message })
-        return failed
+        return this.settleThrownFailure(abort.signal, error)
       }
     })().finally(() => {
       this.preparationAbort = undefined

@@ -548,6 +548,31 @@ export interface SessionSurfaceCut {
 }
 
 /**
+ * Yield the captured events of the requested types across one validated
+ * sequence range, in the caller's direction, without materializing the
+ * filtered subset.
+ * @param captured - frozen contiguous event array indexed by seq.
+ * @param types - event types to include; duplicates have no effect.
+ * @param range - inclusive start and exclusive end seq from `logRange`.
+ * @param direction - `'forward'` walks `[start, end)` ascending; `'reverse'` walks it descending.
+ * @returns matching events in the requested direction.
+ */
+function* eventsOfTypes<T extends SessionEventType>(
+  captured: readonly SessionEvent[],
+  types: readonly T[],
+  range: readonly [number, number],
+  direction: 'forward' | 'reverse',
+): Generator<SessionEvent<T>> {
+  const [start, end] = range
+  const selected = new Set<SessionEventType>(types)
+  const count = end - start
+  for (let index = 0; index < count; index += 1) {
+    const event = captured[direction === 'forward' ? start + index : end - 1 - index] as SessionEvent
+    if (selected.has(event.type)) yield event as SessionEvent<T>
+  }
+}
+
+/**
  * Capture an expanded immutable event array behind the {@link SessionLogCut}
  * read interface. This is the adapter for persistence implementations whose
  * native representation is already one event per element; packed Session logs
@@ -588,28 +613,14 @@ export function sessionLogCutFromEvents(events: readonly SessionEvent[]): Sessio
       from?: number,
       to?: number,
     ): Iterable<SessionEvent<T>> {
-      const [start, end] = logRange(captured.length, from, to)
-      const selected = new Set<SessionEventType>(types)
-      return (function* (): Generator<SessionEvent<T>> {
-        for (let seq = start; seq < end; seq += 1) {
-          const event = captured[seq] as SessionEvent
-          if (selected.has(event.type)) yield event as SessionEvent<T>
-        }
-      })()
+      return eventsOfTypes(captured, types, logRange(captured.length, from, to), 'forward')
     },
     reverseValuesOf<T extends SessionEventType>(
       types: readonly T[],
       from?: number,
       to?: number,
     ): Iterable<SessionEvent<T>> {
-      const [start, end] = logRange(captured.length, from, to)
-      const selected = new Set<SessionEventType>(types)
-      return (function* (): Generator<SessionEvent<T>> {
-        for (let seq = end - 1; seq >= start; seq -= 1) {
-          const event = captured[seq] as SessionEvent
-          if (selected.has(event.type)) yield event as SessionEvent<T>
-        }
-      })()
+      return eventsOfTypes(captured, types, logRange(captured.length, from, to), 'reverse')
     },
     chunkRuns(from?: number, to?: number): Iterable<SessionChunkRun> {
       const [start, end] = logRange(captured.length, from, to)

@@ -30,6 +30,15 @@ const VIEW_PROPERTIES = {
   active: { type: 'string' },
 } as const
 
+/**
+ * Model-facing output contract shared by the three workbench tools: one text
+ * block carrying the rendered view, and nothing else.
+ */
+const VIEW_OUTPUT = {
+  schema: { type: 'object' as const, additionalProperties: false, properties: VIEW_PROPERTIES },
+  render: (_args: unknown, value: { text: string }) => [{ type: 'text' as const, text: value.text }],
+}
+
 /** One tool card per view-control call. */
 function viewCall(title: string, rawInput?: unknown): GenericCallView {
   return { card: 'generic', title, kind: 'execute', ...rawInput === undefined ? {} : { rawInput } }
@@ -56,10 +65,7 @@ export function apply(ctx: Context): void {
     parameters: {
       panel: { type: 'string', description: 'Panel id to select. Omit to keep the current selection.' },
     },
-    output: {
-      schema: { type: 'object', additionalProperties: false, properties: VIEW_PROPERTIES },
-      render: (_args, value) => [{ type: 'text', text: value.text }],
-    },
+    output: VIEW_OUTPUT,
     execute(args) {
       return Promise.resolve(viewResult(ctx.workbench.open(args.panel ?? null)))
     },
@@ -70,10 +76,7 @@ export function apply(ctx: Context): void {
     name: 'workbench_close',
     description: 'Close the shared workbench column. The selected panel is remembered for the next open.',
     parameters: {},
-    output: {
-      schema: { type: 'object', additionalProperties: false, properties: VIEW_PROPERTIES },
-      render: (_args, value) => [{ type: 'text', text: value.text }],
-    },
+    output: VIEW_OUTPUT,
     execute() {
       return Promise.resolve(viewResult(ctx.workbench.close()))
     },
@@ -84,10 +87,7 @@ export function apply(ctx: Context): void {
     name: 'workbench_status',
     description: 'Read the shared workbench view: whether the column is open and which panel is selected.',
     parameters: {},
-    output: {
-      schema: { type: 'object', additionalProperties: false, properties: VIEW_PROPERTIES },
-      render: (_args, value) => [{ type: 'text', text: value.text }],
-    },
+    output: VIEW_OUTPUT,
     execute() {
       return Promise.resolve(viewResult(ctx.workbench.state()))
     },

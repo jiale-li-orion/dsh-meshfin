@@ -7,9 +7,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import { collectTurnUserMessages, enterWithSnapshotMessage } from '@deepseek-ai/dsh-agent'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
-import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import type { UserMessage } from '@deepseek-ai/dsh-llm'
 import {
   deriveBrowserTimeZoneContext,
   renderBrowserTimeZoneContext,
@@ -90,23 +89,6 @@ function latestInjectionTime(agent: Agent): number | undefined {
   return undefined
 }
 
-/** Collect already-entered and proposed user messages belonging to one open turn. */
-function requestMessages(agent: Agent, turn: number, proposed: readonly UserMessage[]): UserMessage[] {
-  const log = agent.session.readLog()
-  let start: number | undefined
-  for (const event of log.reverseValuesOf(['turn/start'])) {
-    if (event.data.turn === turn) {
-      start = event.seq
-      break
-    }
-  }
-  const entered: UserMessage[] = []
-  if (start !== undefined) {
-    for (const event of log.valuesOf(['user/message'], start + 1)) entered.push(event.data)
-  }
-  return [...entered, ...proposed]
-}
-
 function renderText(
   now: number,
   turn: number,
@@ -183,7 +165,7 @@ export function apply(ctx: Context, config: Config): void {
     const previous = step === 1
       ? precedingMessageTime(agent)
       : precedingStepContextTime(agent, turn)
-    const messages = requestMessages(agent, turn, decision.messages)
+    const messages = collectTurnUserMessages(agent.session.readLog(), turn, decision.messages)
     const browser = deriveBrowserTimeZoneContext(messages)
     const selectedTimeZone = browser.kind === 'resolved' ? browser.timeZone : fallbackTimeZone
     const text = renderText(
@@ -195,15 +177,6 @@ export function apply(ctx: Context, config: Config): void {
       selectedTimeZone,
       browser,
     )
-    return {
-      kind: 'enter',
-      messages: [
-        ...decision.messages,
-        createUserMessage({
-          content: [{ type: 'text', text }],
-          source: { kind: 'plugin', plugin: name, form: 'snapshot', sections: [{ name, text }] },
-        }),
-      ],
-    }
+    return enterWithSnapshotMessage(decision, name, text)
   }, { prepend: true })
 }

@@ -13,6 +13,7 @@ import type { WorkbenchListing } from '@deepseek-ai/dsh-workbench/types'
 import type { FilePanelInjected } from './FilePanel.tsx'
 import type { NS } from './locales.ts'
 import css from './UploadsPanel.module.css'
+import { formatSize } from './format-size'
 
 /** Directory uploads land in, relative to the session workspace. */
 const UPLOADS_DIR = 'uploads'
@@ -50,14 +51,6 @@ export type UploadsPanelProps =
   & PropsRuntime<'workbench.panel'>
   & InjectFace<FilePanelInjected>
   & PropsLocale<typeof NS>
-
-/** Human-readable size for one row. */
-function formatSize(bytes: number | undefined): string {
-  if (bytes === undefined) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 /**
  * Read every upload of one session, grouped by the device that sent it.

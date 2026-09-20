@@ -389,18 +389,7 @@ export class SessionProjectionRegistry extends Service {
     baseSeq: number = 0,
   ): { snapshot: ProjectionSnapshot; checkpoint: ProjectionCheckpoint } {
     const cells = this.restoreLogCells(checkpoint, log, baseSeq, [...this.registrations.values()], false)
-    const values: Record<string, unknown> = {}
-    const refreshed: ProjectionCheckpoint = {}
-    const endSeq = log.length - 1
-    for (const cell of cells) {
-      const def = cell.registration.def
-      values[def.key] = def.schema.parse(def.view(cell.state))
-      refreshed[def.key] = { ver: def.stateVersion, seq: endSeq, val: cell.state }
-    }
-    return {
-      snapshot: { asOfSeq: endSeq, values },
-      checkpoint: refreshed,
-    }
+    return this.projectCut(cells, log.length - 1)
   }
 
   /**
@@ -445,23 +434,13 @@ export class SessionProjectionRegistry extends Service {
     const groups = new Map<number, Array<{ registration: Registration; state: unknown; from: number }>>()
     for (const registration of registrations) {
       const def = registration.def
-      const row = checkpoint[def.key]
-      const usable = row !== undefined
-        && row.ver === def.stateVersion
-        && row.seq >= baseSeq - 1
-        && row.seq <= endSeq
-      if (!usable && baseSeq > 0) {
-        throw new Error(
-          `session projection ${JSON.stringify(def.key)} cannot restore from seq ${baseSeq}: `
-          + 'its checkpoint row is missing, version-mismatched, or beyond the supplied log end; re-read from seq 0',
-        )
-      }
+      const row = this.usableRow(checkpoint, def, baseSeq, endSeq)
       const cell = {
         registration,
-        state: usable
-          ? detachCheckpointState ? structuredClone(row.val) : row.val
-          : def.init(),
-        from: usable ? row.seq + 1 : baseSeq,
+        state: row === undefined
+          ? def.init()
+          : detachCheckpointState ? structuredClone(row.val) : row.val,
+        from: row === undefined ? baseSeq : row.seq + 1,
       }
       cells.push(cell)
       if (cell.from >= log.length) continue
@@ -499,23 +478,15 @@ export class SessionProjectionRegistry extends Service {
     baseSeq: number,
     endSeq: number,
   ): { snapshot: ProjectionSnapshot; checkpoint: ProjectionCheckpoint } {
-    const values: Record<string, unknown> = {}
-    const refreshed: ProjectionCheckpoint = {}
     const cells: Array<{ registration: Registration; state: unknown; from: number }> = []
     for (const registration of this.registrations.values()) {
       const def = registration.def
-      const row = checkpoint[def.key]
-      const usable = row !== undefined
-        && row.ver === def.stateVersion
-        && row.seq >= baseSeq - 1
-        && row.seq <= endSeq
-      if (!usable && baseSeq > 0) {
-        throw new Error(
-          `session projection ${JSON.stringify(def.key)} cannot restore from seq ${baseSeq}: `
-          + 'its checkpoint row is missing, version-mismatched, or beyond the supplied log end; re-read from seq 0',
-        )
-      }
-      cells.push({ registration, state: usable ? row.val : def.init(), from: usable ? row.seq : baseSeq - 1 })
+      const row = this.usableRow(checkpoint, def, baseSeq, endSeq)
+      cells.push({
+        registration,
+        state: row === undefined ? def.init() : row.val,
+        from: row === undefined ? baseSeq - 1 : row.seq,
+      })
     }
     for (const event of events) {
       for (const cell of cells) {
@@ -524,13 +495,60 @@ export class SessionProjectionRegistry extends Service {
         }
       }
     }
+    return this.projectCut(cells, endSeq)
+  }
+
+  /**
+   * Resolve one unit's checkpoint row against a restore window. A discarded
+   * row refolds from `init`, which is only sound over the full log, so an
+   * unusable row above seq 0 throws (the caller re-reads from seq 0).
+   * @param checkpoint - persisted rows for one session.
+   * @param def - the unit whose row is resolved.
+   * @param baseSeq - first seq the supplied log represents.
+   * @param endSeq - last seq the supplied log represents.
+   * @returns the usable row, or `undefined` when the unit must refold from `init`.
+   */
+  private usableRow(
+    checkpoint: ProjectionCheckpoint,
+    def: ErasedDefinition,
+    baseSeq: number,
+    endSeq: number,
+  ): ProjectionCheckpointRow | undefined {
+    const row = checkpoint[def.key]
+    const usable = row !== undefined
+      && row.ver === def.stateVersion
+      && row.seq >= baseSeq - 1
+      && row.seq <= endSeq
+    if (!usable && baseSeq > 0) {
+      throw new Error(
+        `session projection ${JSON.stringify(def.key)} cannot restore from seq ${baseSeq}: `
+        + 'its checkpoint row is missing, version-mismatched, or beyond the supplied log end; re-read from seq 0',
+      )
+    }
+    return usable ? row : undefined
+  }
+
+  /**
+   * Project folded cells into the read face at one cut: every unit's `view`
+   * output is schema-validated before it leaves the host, and each unit's
+   * refreshed checkpoint row carries the state at that cut.
+   * @param cells - folded states of the units included in this cut.
+   * @param endSeq - last seq every value and row reflects.
+   * @returns the snapshot cut at `endSeq` plus the refreshed checkpoint rows.
+   */
+  private projectCut(
+    cells: readonly { registration: Registration; state: unknown }[],
+    endSeq: number,
+  ): { snapshot: ProjectionSnapshot; checkpoint: ProjectionCheckpoint } {
+    const values: Record<string, unknown> = {}
+    const refreshed: ProjectionCheckpoint = {}
     for (const cell of cells) {
       const def = cell.registration.def
       values[def.key] = def.schema.parse(def.view(cell.state))
       refreshed[def.key] = { ver: def.stateVersion, seq: endSeq, val: cell.state }
     }
     return {
-      snapshot: { asOfSeq: endSeq, values: values },
+      snapshot: { asOfSeq: endSeq, values },
       checkpoint: refreshed,
     }
   }

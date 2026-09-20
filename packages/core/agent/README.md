@@ -60,6 +60,10 @@ Turn and step boundaries and the model token stream are durable `session/event` 
 
 `foldConsumedWork(events)` reads that feed back for the one question the turn sequence cannot answer alone: what became of the work a log consumed. It returns the latest `turn/end` that accounts for consumed work — a turn that entered a model step, or one that claimed inbox input and then failed, was stopped, or was rejected before reaching one — plus whether accepted work was later cancelled out of the inbox unrun. Both facts come from the log, so a cancellation reads the same whichever owner issued it. A no-step turn that took nothing, or emptied its claim and completed, describes no work and is skipped; a `blocked` end over claimed input is an account, because rejection discarded that input.
 
+`collectTurnUserMessages(log, turn, proposed)` answers the other log question a pre-step listener has: which user messages the turn it is preparing carries. It scans the cut backwards for that turn's `turn/start`, returns the `user/message` events logged after it in log order, and appends the batch the step proposes. A cut holding no boundary for that turn contributes the proposed batch alone.
+
+`enterWithSnapshotMessage(decision, plugin, text)` builds the enter decision for a listener that adds its own context to the request: the step's batch, then one `snapshot`-form plugin message carrying `text` and attributed to `plugin`. The message is appended, so the batch keeps the order the chain produced.
+
 ### Agent interface (`types.ts`)
 
 The handle every plugin programs against:

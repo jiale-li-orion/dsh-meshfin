@@ -60,6 +60,10 @@ inbox 的实时通知刻意采用逐消息的最小载荷：`agent/inbox/inserte
 
 `foldConsumedWork(events)` 把这条事件流读回来，回答仅凭轮次序列无法回答的那个问题：一份日志消费掉的工作最终怎样了。它返回能够为已消费工作作出交代的最新 `turn/end`——即进入过模型 step 的轮次，或者认领了 inbox 输入、但在进入 step 之前失败、被停下或被拒绝的轮次——并额外给出「已接受的工作此后是否被从 inbox 中取消且从未运行」。两项事实都来自日志，因此无论由哪个所有者发起取消，读出来都一样。没有取走任何输入、或认领批次被改写清空后正常结束的无 step 轮次不描述工作，会被跳过；认领过输入、以 `blocked` 结束的轮次则是一份交代，因为拒绝把这些输入一并丢弃了。
 
+`collectTurnUserMessages(log, turn, proposed)` 回答 pre-step 监听器面临的另一个日志问题：它正在准备的轮次携带哪些用户消息。它在该日志切片中反向扫描，找到该轮次的 `turn/start`，按日志顺序返回其后的 `user/message` 事件，再追加本步骤拟发送的批次。切片中没有该轮次起点的，只贡献拟发送批次。
+
+`enterWithSnapshotMessage(decision, plugin, text)` 为需要向请求添加自身上下文的监听器构造 enter 决策：先给出本步骤的批次，再追加一条 `snapshot` 形式的插件消息，其内容为 `text`、来源归属 `plugin`。该消息是追加而非前置，因此批次保持链路产生的顺序。
+
 ### Agent 接口（`types.ts`）
 
 每个插件面向的 handle：

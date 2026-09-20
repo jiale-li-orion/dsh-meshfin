@@ -15,6 +15,7 @@ import type { createFilePanelStore } from './file-panel-store.ts'
 import { parentPath } from './listing.ts'
 import type { NS } from './locales.ts'
 import css from './FilePanel.module.css'
+import { formatSize } from './format-size'
 
 /** Media type used when a file entry carried none; nothing renders it. */
 const UNKNOWN_MEDIA_TYPE = 'application/octet-stream'
@@ -41,14 +42,6 @@ export type FilePanelProps =
   & InjectFace<FilePanelInjected>
   & PropsStore<ReturnType<typeof createFilePanelStore>>
   & PropsLocale<typeof NS>
-
-/** Human-readable size for a file row. */
-function formatSize(bytes: number | undefined): string {
-  if (bytes === undefined) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
-}
 
 /**
  * Render the file panel.
