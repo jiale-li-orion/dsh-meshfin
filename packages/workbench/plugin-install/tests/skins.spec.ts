@@ -45,9 +45,11 @@ afterEach(() => {
 describe('profileDirectory', () => {
   it('honours DSH_HOME and otherwise falls back to the home directory', () => {
     vi.stubEnv('DSH_HOME', '/custom/home')
-    expect(profileDirectory('web')).toBe('/custom/home/profiles/web')
+    // profileDirectory joins segments with the platform separator, so the
+    // expectation is built the same way rather than pinning POSIX separators.
+    expect(profileDirectory('web')).toBe(join('/custom/home', 'profiles', 'web'))
     vi.stubEnv('DSH_HOME', undefined)
-    expect(profileDirectory('web')).toMatch(/\/\.dsh\/profiles\/web$/)
+    expect(profileDirectory('web')).toMatch(/[\\/]\.dsh[\\/]profiles[\\/]web$/)
   })
 })
 

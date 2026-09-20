@@ -718,7 +718,11 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
       expect(stdout).toContain("name: '@deepseek-ai/dsh-headless'")
       expect(stdout).not.toMatch(/name: '@deepseek-ai\/dsh-host-/)
       expect(stdout).not.toContain("name: '@deepseek-ai/dsh-web-app'")
-      expect(stdout).not.toMatch(/name: '@deepseek-ai\/dsh-client-/)
+      // The headless profile composes no browser layer. `dsh-client-origin` is a
+      // host-side context plugin despite its package name, so the assertion names
+      // the packages that render or serve in a browser instead of every
+      // `dsh-client-*` row.
+      expect(stdout).not.toMatch(/name: '@deepseek-ai\/dsh-client-(ui-|runtime|connection|modules|locale|hmr)/)
     }, 30_000)
 
     it('composes the profile user layer and a --patch overlay in order', async () => {
