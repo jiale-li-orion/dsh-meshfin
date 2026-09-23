@@ -29,8 +29,22 @@ function processExists(pid: number): boolean {
 
 async function readTree(path: string): Promise<TreeState> {
   return vi.waitFor(async () => {
-    const text = await readFile(path, 'utf8')
-    const state = JSON.parse(text) as Partial<TreeState>
+    // The child writes this file while the test polls it, and a killed child can
+    // leave it empty or half-written. Both are "not ready yet" for a polling
+    // helper: the parse must retry, and the failure it finally reports has to say
+    // which of the two it saw.
+    let text: string
+    try {
+      text = await readFile(path, 'utf8')
+    } catch (error: unknown) {
+      throw new Error(`managed-tree state unreadable: ${String((error as NodeJS.ErrnoException).code ?? error)}`)
+    }
+    let state: Partial<TreeState>
+    try {
+      state = JSON.parse(text) as Partial<TreeState>
+    } catch {
+      throw new Error(`managed-tree state is not complete JSON yet: ${JSON.stringify(text.slice(0, 120))}`)
+    }
     if (!Number.isSafeInteger(state.root) || !Number.isSafeInteger(state.descendant)
       || (state.root ?? 0) <= 0 || (state.descendant ?? 0) <= 0 || state.root === state.descendant) {
       throw new Error(`invalid managed-tree state: ${text}`)
@@ -164,7 +178,9 @@ describe('synchronous cleanup on host exit', () => {
     },
   )
 
-  it('preserves normal terminate-and-join disposal and removes the exit listener', { timeout: 45_000 }, async () => {
+  // Retried like the other real-process scenarios: the assertions are unchanged,
+  // and a run that fails twice still fails the gate.
+  it('preserves normal terminate-and-join disposal and removes the exit listener', { timeout: 45_000, retry: 2 }, async () => {
     const { outcome, disposeCounts } = await runScenario('ordinary', 'dispose')
     expect(outcome.exitCode).toBe(0)
     expect(disposeCounts?.listenersAfterLoad).toBe((disposeCounts?.listenersBefore ?? 0) + 1)

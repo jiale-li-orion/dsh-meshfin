@@ -443,7 +443,14 @@ export class ClientModuleRegistry extends Service {
     // the current one can be cached until that revision changes — which is what
     // makes a repeat visit skip a round trip per bundle over a relayed link. The
     // source map is requested without a revision, so it stays revalidated.
-    const cacheable = !isSourceMap && url.searchParams.get('rev') === this.table.get(id ?? '')?.entry.rev
+    // Immutable only while nothing watches for rebuilds. The HMR driver re-imports
+    // an entry under the URL it already holds, so an immutable response for that
+    // URL would be served from the browser cache without a request and a rebuilt
+    // bundle would never arrive; with a rebuild listener registered the response
+    // stays revalidated, and a deployment without the HMR driver keeps the caching.
+    const cacheable = !isSourceMap
+      && this.rebuildListeners.size === 0
+      && url.searchParams.get('rev') === this.table.get(id ?? '')?.entry.rev
     if (path === undefined) {
       res.writeHead(404)
       res.end()

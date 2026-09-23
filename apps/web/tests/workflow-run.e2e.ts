@@ -18,6 +18,9 @@ import {
   connectFreshWorkspace, newEnglishPage, REPO_ROOT, saveFailureShot,
 } from './support.ts'
 
+/** Cramped-column width inside the desktop frame; below 1024 the mobile frame replaces it. */
+const NARROW_VIEWPORT_WIDTH = 1040
+
 const MODE = webSnapshotMode()
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/workflow-run', import.meta.url))
 const UI_EXPECTED = join(SNAPSHOT_DIR, 'ui.expected.md')
@@ -89,7 +92,10 @@ describe.skipIf(MODE === 'record')('web e2e: durable workflow run in Chat', () =
     await member.focus()
 
     const lightColor = await member.locator('[data-member-label]').evaluate(element => getComputedStyle(element).color)
-    await page.setViewportSize({ width: 560, height: 800 })
+    // The viewport stays inside the desktop frame: the panel width under test is
+    // forced inline below, and below 1024 the mobile frame hides the conversation
+    // page, so the row would measure zero.
+    await page.setViewportSize({ width: NARROW_VIEWPORT_WIDTH, height: 800 })
     await page.evaluate(() => { document.body.setAttribute('data-ds-dark-theme', '') })
     const darkNarrow = await page.locator('[data-workflow-run]').evaluate((element) => {
       const panel = element as HTMLElement

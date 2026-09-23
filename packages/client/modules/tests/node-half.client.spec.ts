@@ -146,6 +146,17 @@ describe('client bundle activation', () => {
     // No revision, or one this build no longer has: revalidate instead.
     expect(await cacheControl(`/plugins/${packageName}/client.js`)).toBe('no-cache')
     expect(await cacheControl(`/plugins/${packageName}/client.js?rev=stale`)).toBe('no-cache')
+
+    // A registered rebuild listener is the HMR driver: it re-imports the entry
+    // under the URL it already holds, so an immutable response for that URL would
+    // be replayed from the browser cache without a request and a rebuilt bundle
+    // would never arrive. Registration therefore turns the same URL revalidating,
+    // and removing it restores the content-addressed caching.
+    const unsubscribe = service.onRebuilt(() => {})
+    expect(await cacheControl(`/plugins/${packageName}/client.js?rev=${String(rev)}`)).toBe('no-cache')
+    unsubscribe()
+    expect(await cacheControl(`/plugins/${packageName}/client.js?rev=${String(rev)}`))
+      .toBe('public, max-age=31536000, immutable')
   })
 
   it('serves the source map beside a registered client bundle', async () => {

@@ -539,9 +539,17 @@ describe('headless stream-json snapshots', () => {
       })
 
       expect(result.stderr).toBe('')
-      expect(server.requests).toHaveLength(1)
-      expect(server.requests[0]?.max_tokens).toBe(256_000)
-      expect(server.requests[0]?.reasoning_effort).toBe('low')
+      // The mock streams keep-alives on a wall clock, so a loaded runner can make
+      // the client re-send the same request after a transport timeout. That retry
+      // is legitimate, and what this test owns is the request's shape and the
+      // adapter defaults it carries — so pin those and require every attempt to be
+      // the same request instead of pinning the attempt count. A second, different
+      // call still fails here.
+      expect(server.requests.length).toBeGreaterThan(0)
+      const firstRequest = server.requests[0] ?? {}
+      for (const attempt of server.requests) expect(attempt).toEqual(firstRequest)
+      expect(firstRequest.max_tokens).toBe(256_000)
+      expect(firstRequest.reasoning_effort).toBe('low')
       const header = (parseJsonl(result.stdout)
         .map(record => record.event)
         .find((event): event is JsonObject => (

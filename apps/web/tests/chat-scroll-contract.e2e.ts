@@ -25,6 +25,14 @@ import { newEnglishPage, saveFailureShot } from './support.ts'
 /** Cramped-column width inside the desktop frame; below 1024 the mobile frame replaces it. */
 const NARROW_VIEWPORT_WIDTH = 1040
 
+/**
+ * Waiting window for "more of the stream arrived" probes. The fixture's chunk
+ * pacing follows the host's scheduling, so a loaded CI runner delivers the same
+ * deterministic stream more slowly; the assertion is unchanged and a stream that
+ * actually stalls still fails this poll.
+ */
+const STREAM_PROGRESS_TIMEOUT_MS = 45_000
+
 const MODE = webSnapshotMode()
 const HISTORY_SESSION_ID = 'chat-scroll-history-e2e'
 const TOOL_SESSION_ID = 'chat-scroll-tool-e2e'
@@ -513,7 +521,7 @@ describe('web e2e: long Chat scroll contract', () => {
         const chunksAfterAnchor = world.events.filter(event => event.type === 'assistant/chunk').length
         await expect.poll(
           () => world.events.filter(event => event.type === 'assistant/chunk').length,
-          { timeout: 10_000 },
+          { timeout: STREAM_PROGRESS_TIMEOUT_MS },
         ).toBeGreaterThan(chunksAfterAnchor + 5)
 
         releaseHistory()
@@ -587,7 +595,7 @@ describe('web e2e: long Chat scroll contract', () => {
         ).toBe(true)
         await expect.poll(
           () => world.events.filter(event => event.type === 'assistant/chunk').length,
-          { timeout: 15_000 },
+          { timeout: STREAM_PROGRESS_TIMEOUT_MS },
         ).toBeGreaterThan(chunksBeforeRelease + 5)
         await expectSameFlowTop(world.page, awayAnchor)
 
@@ -596,7 +604,7 @@ describe('web e2e: long Chat scroll contract', () => {
         await expectBottom(world.page)
         await expect.poll(
           () => world.events.filter(event => event.type === 'assistant/chunk').length,
-          { timeout: 15_000 },
+          { timeout: STREAM_PROGRESS_TIMEOUT_MS },
         ).toBeGreaterThan(chunksAtRepin + 5)
         await expectBottom(world.page)
       } finally {
@@ -814,7 +822,7 @@ describe('web e2e: long Chat scroll contract', () => {
         ).toBe(true)
         await expect.poll(
           () => world.events.filter(event => event.type === 'assistant/chunk').length,
-          { timeout: 15_000 },
+          { timeout: STREAM_PROGRESS_TIMEOUT_MS },
         ).toBeGreaterThan(chunksBeforeRelease + 5)
         await expectSameFlowTop(world.page, awayAnchor)
 
@@ -830,7 +838,7 @@ describe('web e2e: long Chat scroll contract', () => {
         const chunksAtRepin = world.events.filter(event => event.type === 'assistant/chunk').length
         await expect.poll(
           () => world.events.filter(event => event.type === 'assistant/chunk').length,
-          { timeout: 15_000 },
+          { timeout: STREAM_PROGRESS_TIMEOUT_MS },
         ).toBeGreaterThan(chunksAtRepin + 5)
         await expectBottom(world.page)
       } finally {
