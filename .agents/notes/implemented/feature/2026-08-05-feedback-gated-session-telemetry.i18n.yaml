@@ -1,6 +1,0 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
-#   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-05-feedback-gated-session-telemetry.md
-2026-08-05-feedback-gated-session-telemetry.md: 054ef58383e4884bac276929557424b0543f4506
-2026-08-05-feedback-gated-session-telemetry.zh.md: 437e5b4d98b15ff7c0a021e45bc6e055930d9189

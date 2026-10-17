@@ -1,142 +1,106 @@
 /**
  * LayoutController: the cross-plugin panel-action face behind ctx.layout.
- * Panel geometry itself lives in the root entry's layout store (stores.ts);
+ * Panel geometry and main-panel selection live in the root layout store;
  * the current-session selection lives with the runtime sessions service, and
  * the per-session active view dissolved into ui-conversation's session store
  * (its only consumer). What remains here is the contract other plugins'
- * apply worlds reach for panel transitions (sidebar toggle from ui-sidebar,
- * details open/close from ui-conversation) — writes stay inside the store's
- * declared action set, delivered as the registration's bound actions.
+ * apply worlds reach for panel transitions (main-panel selection and sidebar toggle,
+ * right-panel show/hide from ui-sidebar-right) — writes stay inside the
+ * store's declared action set, shared with the root registration.
  */
-import type { BoundActions } from '@deepseek-ai/dsh-client-ui-slots'
+import type { BoundActions, HostObservable } from '@deepseek-ai/dsh-client-ui-slots'
+import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { createLayoutStore } from './stores.ts'
-import { applyUiScale, readUiScale, rememberUiScale, UI_SCALES } from './ui-scale.ts'
+
+/** Identity shared by a sidebar panel entry and its main-slot occupant. */
+export type MainPanelId = Branded<'MainPanelId'>
+
+/** Root-scoped navigation state exposed to panel-aware components. */
+export interface PanelInfo {
+  /** Selected global panel; null displays the current Conversation. */
+  readonly activePanelId: MainPanelId | null
+}
 
 /** The layout store's bound action set (framework-baked, draft params peeled). */
 export type PanelActions = BoundActions<ReturnType<typeof createLayoutStore>>
 
-/**
- * The outward layout face (`ctx.layout`): the panel transitions other
- * plugins may trigger — and exactly what a test fake must supply. The
- * attachPanels wiring hook stays on the concrete class (root-entry assembly
- * only).
- */
+/** Panel navigation and geometry actions exposed through ctx.layout. */
 export interface ILayout {
-  /** @returns the offered interface scales, smallest first. */
-  uiScales(): readonly number[]
-  /** @returns the interface scale this device renders at. */
-  uiScale(): number
+  /** Selected central panel from the same root store used by `usePanelInfo`. */
+  readonly panelInfo: HostObservable<PanelInfo>
   /**
-   * Set and remember the interface scale for this device.
-   * @param scale - one of the offered steps.
+   * Select a global central panel without changing the current Session.
+   * @param panelId - registered main key, or null to show the Conversation.
+   * @throws if the selected main key is not registered; preserves the current selection.
    */
-  setUiScale(scale: number): void
+  selectPanel(panelId: MainPanelId | null): void
   /**
-   * Show one page in a narrow frame.
-   * @param page - the page a narrow frame should show.
+   * Start an asynchronous navigation, superseding any earlier pending navigation.
+   * @returns a signal aborted by the next navigation or layout disposal; check it before committing UI state.
    */
-  setMobilePage(page: 'conversation' | 'list' | 'workbench'): void
+  beginNavigation(): AbortSignal
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
   toggleSidebar(): void
-  /** Open the workbench column (no-op when already open). */
-  openWorkbench(): void
-  /** Close the workbench column. */
-  closeWorkbench(): void
-  /** Toggle the workbench column (closed ⟷ contract default width). */
-  toggleWorkbench(): void
-  /** Open the details panel (no-op when already open). */
-  openDetails(): void
-  /** Close the details panel. */
-  closeDetails(): void
+  /**
+   * Report the right panel's presentation without changing its expanded state.
+   * @param track - whether the normal panel width reserves a grid track,
+   *   including beneath a fullscreen overlay.
+   * @param fullscreen - whether the panel covers the frame and hides its outer
+   *   resize handle; independent of the underlying grid track.
+   */
+  openRightbar(track: boolean, fullscreen: boolean): void
+  /** Report the right panel as hidden: no track, no handle. */
+  closeRightbar(): void
 }
 
 /** Cross-plugin panel-action face (ctx.layout). */
 export class LayoutController implements ILayout {
-  #panels: PanelActions | undefined
-  #scale: number | undefined
-
-  /** @returns the offered interface scales, smallest first. */
-  uiScales(): readonly number[]
-  /** @returns the offered interface scales, smallest first. */
-  uiScales(): readonly number[] {
-    return UI_SCALES
-  }
-
-  /** @returns the interface scale this device renders at. */
-  uiScale(): number {
-    this.#scale ??= readUiScale()
-    return this.#scale
-  }
+  private navigation = new AbortController()
 
   /**
-   * Set and remember the interface scale for this device.
-   * @param scale - one of the offered steps.
+   * @param panels - actions of the instance shared with the root entry.
+   * @param hasMainPanel - checks the live main-slot registry for a panel id.
+   * @param panelInfo - root store's shared central-panel selection source.
    */
-  setUiScale(scale: number): void {
-    this.#scale = scale
-    applyUiScale(scale, document.documentElement)
-    rememberUiScale(scale)
+  constructor(
+    private readonly panels: PanelActions,
+    private readonly hasMainPanel: (id: MainPanelId) => boolean,
+    readonly panelInfo: HostObservable<PanelInfo>,
+  ) {}
+
+  /** Select a global panel or return to the Conversation. */
+  selectPanel(panelId: MainPanelId | null): void {
+    if (panelId !== null && !this.hasMainPanel(panelId)) {
+      throw new Error(`layout.selectPanel: main panel "${panelId}" is not registered`)
+    }
+    this.navigation.abort()
+    this.panels.selectPanel(panelId)
   }
 
-  /**
-   * Adopt the root entry's bound store actions. Called from the root
-   * registration's inject hook (a sanctioned assembly side effect), so the
-   * face is live from the entry's first render; on entry re-register the
-   * fresh actions overwrite the stale set.
-   * @param actions - bound actions of the entry's layout store instance.
-   */
-  attachPanels(actions: PanelActions): void {
-    this.#panels = actions
+  /** @returns the new pending navigation's cancellation signal. */
+  beginNavigation(): AbortSignal {
+    this.navigation.abort()
+    this.navigation = new AbortController()
+    return this.navigation.signal
   }
 
-  /**
-   * Show one page in a narrow frame.
-   * @param page - the page a narrow frame should show.
-   */
-  setMobilePage(page: 'conversation' | 'list' | 'workbench'): void
-  /**
-   * Show one page in a narrow frame.
-   * @param page - the page a narrow frame should show.
-   */
-  setMobilePage(page: 'conversation' | 'list' | 'workbench'): void {
-    this.#require().setMobilePage(page)
+  /** Invalidate pending navigations when the layout owner is unloaded. */
+  dispose(): void {
+    this.navigation.abort()
   }
 
   /** Toggle the sidebar panel (closed ⟷ contract default width). */
   toggleSidebar(): void {
-    this.#require().toggleSidebar()
+    this.panels.toggleSidebar()
   }
 
-  /** Open the workbench column (no-op when already open). */
-  openWorkbench(): void {
-    this.#require().openWorkbench()
+  /** Report the right panel's track and fullscreen presentation. */
+  openRightbar(track: boolean, fullscreen: boolean): void {
+    this.panels.openRightbar(track, fullscreen)
   }
 
-  /** Close the workbench column. */
-  closeWorkbench(): void {
-    this.#require().closeWorkbench()
-  }
-
-  /** Toggle the workbench column (closed ⟷ contract default width). */
-  toggleWorkbench(): void {
-    this.#require().toggleWorkbench()
-  }
-
-  /** Open the details panel (no-op when already open). */
-  openDetails(): void {
-    this.#require().openDetails()
-  }
-
-  /** Close the details panel. */
-  closeDetails(): void {
-    this.#require().closeDetails()
-  }
-
-  #require(): PanelActions {
-    // Callers are UI gestures, which cannot fire before the root entry
-    // rendered (the inject hook runs in its first render) — reaching this
-    // unwired is a boot-order bug, not a race to tolerate.
-    if (this.#panels === undefined) throw new Error('layout: panel actions not wired (root entry not mounted)')
-    return this.#panels
+  /** Report the right panel as hidden: no track, no handle. */
+  closeRightbar(): void {
+    this.panels.closeRightbar()
   }
 }

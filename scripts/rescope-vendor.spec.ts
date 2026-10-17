@@ -1,14 +1,26 @@
-/**
- * Acceptance-path coverage for the rescope codemod's exact-edit classifier: a
- * duplicated insertion — what a non-idempotent apply produces — must be
- * rejected rather than applied again.
- */
+/** Recorded npm evidence stays intact while authored files and exact edits remain checked. */
 
 import { describe, expect, it } from 'vitest'
-import { exactEditState, rewriteRescopeText } from './rescope-vendor.ts'
+import { exactEditState, isRescopeExcluded } from './rescope-vendor.ts'
 
 const ANCHOR = '\n## Sync procedure'
 const INSERTED = `\n15. **rescope**: one log entry.\n${ANCHOR}`
+
+describe('rescope file selection', () => {
+  it('preserves the recorded npm resolution', () => {
+    expect(isRescopeExcluded('scripts/dependency-catalog/package-lock.json')).toBe(true)
+  })
+
+  it.each([
+    'scripts/dependency-catalog/package.json',
+    'scripts/dependency-catalog/source.ts',
+    'scripts/other/package-lock.json',
+    'packages/example/src/index.ts',
+    'packages/example/package.json',
+  ])('keeps %s subject to upstream package-name checks', (file) => {
+    expect(isRescopeExcluded(file)).toBe(false)
+  })
+})
 
 describe('exactEditState', () => {
   it('classifies an insertion by its target form, so a duplicate is invalid', () => {
@@ -37,35 +49,5 @@ describe('exactEditState', () => {
     // A moved or partially applied site: neither state is complete.
     expect(exactEditState('a = 1\nb = 2\n', 'a = 1', 'b = 2', 1)).toBe('invalid')
     expect(exactEditState('x\n', 'a = 1', 'b = 2', 1)).toBe('invalid')
-  })
-})
-
-describe('runtime Cordis identifiers', () => {
-  it('rescopes package imports without renaming harness event ids', () => {
-    const source = [
-      "import type { Context } from '@deepseek-ai/cordis'",
-      "ctx.emit('cordis/request-run', request)",
-    ].join('\n')
-    expect(rewriteRescopeText(source, 'packages/example/src/index.ts')).toBe([
-      "import type { Context } from '@deepseek-ai/cordis'",
-      "ctx.emit('cordis/request-run', request)",
-    ].join('\n'))
-  })
-
-  it('preserves the UI locale namespace and user-facing source id', () => {
-    const source = "const NS = '@deepseek-ai/cordis'\nconst source = { name: '@deepseek-ai/cordis' }"
-    expect(rewriteRescopeText(source, 'packages/extensions/ui-cordis/src/client/locales.ts')).toBe(source)
-    expect(rewriteRescopeText(source, 'packages/extensions/ui-cordis/src/client/index.ts')).toBe(source)
-  })
-
-  it('preserves the event-scope page key while rescoping package prose', () => {
-    const source = [
-      "  'cordis': 'extensions.md',",
-      " * scans every `declare module 'cordis'` block",
-    ].join('\n')
-    expect(rewriteRescopeText(source, 'scripts/gen-cordis-catalog.ts')).toBe([
-      "  'cordis': 'extensions.md',",
-      " * scans every `declare module '@deepseek-ai/cordis'` block",
-    ].join('\n'))
   })
 })

@@ -13,10 +13,10 @@ import type {
 } from '@deepseek-ai/dsh-subagent'
 
 const DEFAULT_CAPABILITIES: SubagentCapabilities = {
+  agentOptions: true,
+  agentPreset: false,
   outputSchema: true,
   depthLimit: true,
-  toolFilter: true,
-  persona: true,
 }
 
 /** Options for one scripted provider fixture. */
@@ -27,10 +27,14 @@ export interface Config {
   reply?: string
   /** Terminal result reason. */
   stopReason?: SubagentStopReason
+  /** Safe non-assistant detail for a non-completed result. */
+  diagnostic?: string
   /** Start-time features advertised by the provider. */
   capabilities?: Partial<SubagentCapabilities>
   /** Whether tool descriptions say the child inherits completed turns. */
   inheritsParentContext?: boolean
+  /** Provider-owned child route defaults. */
+  agentRouteDefaults?: Readonly<{ provider: string; model: string }>
   /** Structured value returned when the request asks for one. */
   structured?: unknown
   /** Observes each start; the child's result additionally waits for the returned promise. */
@@ -41,6 +45,7 @@ export interface Config {
 class ScriptedSubagentProvider implements SubagentProvider {
   readonly capabilities: SubagentCapabilities
   readonly inheritsParentContext: boolean
+  private started = 0
 
   constructor(
     readonly name: string,
@@ -57,7 +62,8 @@ class ScriptedSubagentProvider implements SubagentProvider {
     const wantsStructured = request.outputSchema !== undefined && this.capabilities.outputSchema
     const stopReason = this.config.stopReason ?? 'completed'
     const state = { cancelled: false }
-    const onAbort = (): void => { state.cancelled = true }
+    const cancelled = Promise.withResolvers<undefined>()
+    const onAbort = (): void => { state.cancelled = true; cancelled.resolve(undefined) }
     request.signal.addEventListener('abort', onAbort, { once: true })
     await Promise.resolve()
     if (state.cancelled) {
@@ -65,24 +71,28 @@ class ScriptedSubagentProvider implements SubagentProvider {
       throw new Error('scripted subagent start aborted before publication')
     }
 
-    const resultFor = (): SubagentResult => ({
-      output,
-      ...wantsStructured ? { structured: this.config.structured ?? { reply } } : {},
-      stopReason: state.cancelled ? 'aborted' : stopReason,
-    })
+    const resultFor = (): SubagentResult => {
+      const terminal = state.cancelled ? 'aborted' : stopReason
+      return {
+        output,
+        ...wantsStructured ? { structured: this.config.structured ?? { reply } } : {},
+        ...this.config.diagnostic !== undefined && terminal !== 'completed'
+          ? { diagnostic: this.config.diagnostic }
+          : {},
+        stopReason: terminal,
+      }
+    }
     const gate = Promise.resolve(this.config.onStart?.(request))
-    const result = gate.then(() => new Promise<SubagentResult>((resolve) => {
-      setTimeout(() => { resolve(resultFor()) }, 0)
-    })).finally(() => {
+    const result = Promise.race([gate, cancelled.promise]).then(resultFor).finally(() => {
       request.signal.removeEventListener('abort', onAbort)
     })
 
     return {
-      id: SessionId(`scripted-subagent:${this.name}:${request.parent.id}`),
-      localAgent: undefined,
+      id: SessionId(`scripted-subagent:${this.name}:${request.parent.id}:${++this.started}`),
       result,
       dispose(): Promise<void> {
         state.cancelled = true
+        cancelled.resolve(undefined)
         request.signal.removeEventListener('abort', onAbort)
         return Promise.resolve()
       },
@@ -101,7 +111,10 @@ export function mountScriptedProvider(ctx: Context, config: Config) {
     name: 'scripted-subagent-provider',
     inject: ['subagents'],
     apply(pluginCtx: Context): void {
-      pluginCtx.subagents.registerProvider(new ScriptedSubagentProvider(config.name, config))
+      const provider = new ScriptedSubagentProvider(config.name, config)
+      pluginCtx.subagents.registerProvider(config.agentRouteDefaults === undefined
+        ? provider
+        : Object.assign(provider, { agentRouteDefaults: config.agentRouteDefaults }))
     },
   })
 }

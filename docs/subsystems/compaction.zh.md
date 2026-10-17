@@ -2,28 +2,40 @@
 
 [English](compaction.md) | 中文
 
-压缩 seam 是一个[能力 seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.md)，与 bash 一样分为 Service Definition（[dsh-compaction](../../packages/compaction/compaction)，`ctx.compaction`）、Service Provider（例如 [dsh-compaction-basic](../../packages/compaction/compaction-basic) 后端）和面向用户的 Consumer（[dsh-command-compact](../../packages/compaction/command-compact)）。压缩是**一项可选能力**，不属于 agent loop（智能体循环）主干，因此其词汇定义在此而非 [core.md](core.md) 中。基于 tokenizer 或模板的后端是实现同一接口的兄弟包。与 bash 不同，该接口必然依赖 `dsh-session` 和 `dsh-llm`：其动词作用于 agent 所有的 `Session`，而其持久摘要事件使用 `ContentBlock` 词汇（见[压缩能力 seam Agent Note](../../.agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md)）。
+压缩 seam 是一个[能力 seam](../../.agents/notes/implemented/architecture/2026-06-13-capability-seams.zh.md)，与 bash 一样分为 Service Definition（[dsh-compaction](../../packages/compaction/compaction)，`ctx.compaction`）、Service Provider（例如 [dsh-compaction-basic](../../packages/compaction/compaction-basic) 后端）和面向用户的 Consumer（[dsh-command-compact](../../packages/compaction/command-compact)）。压缩是**一项可选能力**，不属于 agent loop（智能体循环）主干，因此其词汇定义在此而非 [core.md](core.zh.md) 中。基于 tokenizer 或模板的后端是实现同一接口的兄弟包。与 bash 不同，该接口必然依赖 `dsh-session` 和 `dsh-llm`：其动词作用于 agent 所有的 `Session`，而其持久摘要事件使用 `ContentBlock` 词汇（见[压缩能力 seam 参考](../../packages/compaction/compaction/README.zh.md)）。
 
 源码：[`packages/compaction/compaction/src/types.ts`](../../packages/compaction/compaction/src/types.ts)
 
 ## `compaction/*` 会话事件
 
-压缩通过声明合并为 [`SessionEventMap`](session.md) 扩展锁、摘要、剪枝和可评审 preparation 事件类型。每条 `compaction/*` 记录都**仅写入日志**：这里有意不扩展 `SurfaceEventType`，因此成功摘要仍通过另一条替换 `user/message` 进入模型 surface。[Agent Note](../../.agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md) 负责复用 `user/message` 的决策依据。
+压缩通过声明合并为 [`SessionEventMap`](session.zh.md) 扩展三种事件类型。三者都**仅写入日志**——它们记录锁、摘要、选中范围、被遮蔽事件 seq、token 数以及模型调用，绝不进入 surface。这里有意不扩展 `SurfaceEventType`（只有产生消息的事件才到达模型），因此摘要本身承载在另一条带有 `surfaceOp: { op: 'replace', startSeq, endSeq }` 的 `user/message` 上——这是摘要压缩执行的唯一 surface 变更。[历史Agent Note](../../.agents/notes/archived/feature/2026-06-18-compaction-capability-seam.md) 负责复用 `user/message` 的决策依据。
 
-| 事件族 | 作用 |
-|---|---|
-| `compaction/start`、`compaction/summary`、`compaction/end` | 标准锁 bracket、安全摘要与调用 envelope、准确被遮蔽成员和价格，以及成功或失败闭合。可选 `preparationId` 关联评审提交。 |
-| `compaction/prune` | 紧邻一次无模型工具结果替换之前的 shadow price。 |
-| `compaction/preparation/requested` | 稳定所选 span 端点、成员、digest、token 价格、单元数和可选保留说明。 |
-| `compaction/preparation/planned`、`attempted` | 按容量推导的 direct 或 map/reduce 策略、初始分片，以及流开始前的一份准确提供方调用 envelope。 |
-| `compaction/preparation/call` | 一次完成的 direct、map 或 reduce 提供方调用，包括摘要、路由、用量和来源分片索引。 |
-| `compaction/preparation/ready`、`edited`、`failed`、`discarded` | 生成的分片计划与摘要、最新评审编辑、终态 preparation 失败或评审丢弃。 |
+| 事件 | 载荷 | 作用 |
+|---|---|---|
+| `compaction/start` | `{ turn }` | 获取日志记录的锁；数字标识尚未结束的自动轮次，`null` 标识独立手动尝试 |
+| `compaction/summary` | `{ summary, rawOutput?, llmStreamCall?, shadowedRange, shadowedSeqs, shadowedTokenCount, provider, model, maxTokens?, usage? }` | 安全摘要投影、可选的完整提供方输出与 usage、生成结果时恰好通过此上下文的 `ctx.llm.stream()` 发起一次调用所带的 `llmStreamCall: true` 标记（此时必须提供完整的 `rawOutput`）、被遮蔽的 surface 边界对（`start`/`end` seq——位置跨度，而非数值区间）、按 surface 顺序排列的被遮蔽 seq、估算 token 数，以及摘要调用的 envelope（`provider`、`model`，若有生成上限则还包括该上限）——写入日志后，该一次性请求可由日志 + 代码重建（见可重建性 Agent Note）；未带标记的 `rawOutput` 并不能判定调用路径 |
+| `compaction/end` | `{ turn, error? }` | 使用相同的数字或 `null` 归属值释放锁（`error` 记录失败尝试） |
 
 锁括住**整个**操作：先追加 `compaction/start`，然后执行摘要生成、写入 `compaction/summary` 记录与 `user/message` 替换，最后才追加 `compaction/end`。最后释放锁意味着操作中途崩溃会表现为可检测的遗留锁（有 `compaction/start` 而无匹配的 `compaction/end`），而非一个虚假声称压缩已完成的 `compaction/end`。
 
 这些标记表示锁的时间点，而不是排他的容器。摘要等待期间，不相关的空闲注入可以出现在独立的手动 start 与 end 之间。手动路径只重新验证所选位置 span，因此替换检查点之后仍保留该注入上下文。活动的未匹配 start 会阻塞所有入口点；较新 `session/end-seed` 之前的未匹配 start 是先前生命周期留下的陈旧证据，会被忽略。
 
 这些变体在 `declare module '@deepseek-ai/dsh-session/types'` 块内合并，因此——与其他子系统页面上的顶层类型不同——它们不以漂移检查的 ` ```ts type-equiv ` 块粘贴（`verify-type-equiv` 提取器只按名称匹配顶层声明）。上方的载荷表即为目录条目；权威字段请循源码链接查看。
+
+<a id="image-offload"></a>
+## 图片省略
+
+`compaction-image-offload` 拥有 `image/offload` 声明及其纯消息投影。每个目标指定当前输入节点和按深度优先计数的确切图片位置。事件保留节点和消息身份，不携带 `surfaceOp`。[包 README](../../packages/compaction/compaction-image-offload/README.zh.md)负责恢复策略、注册和独立回放说明。
+
+```ts type-equiv
+/** Exact input-image occurrences selected by one durable offload decision. */
+interface ImageOffloadTarget {
+  /** Current message-producing event containing these occurrences. */
+  seq: SessionSeq
+  /** Zero-based depth-first image indexes within the immutable message. */
+  imageIndexes: number[]
+}
+```
 
 ## `CompactionResult`
 
@@ -37,11 +49,11 @@ interface CompactionResult {
   /** Human command that initiated this compaction, when it was manual. */
   sourceCommandId?: CommandId
   /** The seq of the appended `compaction/start` event. */
-  startSeq: number
+  startSeq: SessionSeq
   /** The seq of the appended `compaction/summary` event. */
-  summarySeq: number
+  summarySeq: SessionSeq
   /** The seq of the appended `compaction/end` event. */
-  endSeq: number
+  endSeq: SessionSeq
   /** The summary content blocks produced by the backend. */
   summary: ContentBlock[]
   /**
@@ -52,105 +64,13 @@ interface CompactionResult {
    * can be GREATER than `end`. {@link CompactionResult.shadowedSeqs} is the
    * authoritative set of shadowed nodes, in surface order.
    */
-  shadowedRange: { start: number; end: number }
+  shadowedRange: { start: SessionSeq; end: SessionSeq }
   /** The seqs of all shadowed surface nodes, in surface order. */
-  shadowedSeqs: number[]
+  shadowedSeqs: SessionSeq[]
   /** Estimated token count of the shadowed content. */
   shadowedTokenCount: number
 }
 ```
-
-## 可评审 preparation 类型
-
-```ts type-equiv
-/** Stable selected-span facts recorded before range summarization starts. */
-interface CompactionPreparationRequest {
-  preparationId: CompactionPreparationId
-  start: number
-  end: number
-  shadowedSeqs: number[]
-  shadowedDigest: string
-  shadowedTokenCount: number
-  unitCount: number
-  preservationBrief?: string
-}
-```
-
-```ts type-equiv
-/** Summarizer stage for one reviewed range preparation request. */
-type CompactionPreparationStage = 'direct' | 'map' | 'reduce'
-```
-
-```ts type-equiv
-/** Capacity-derived plan recorded before a range preparation makes provider calls. */
-interface CompactionPreparationPlan {
-  strategy: 'direct' | 'map-reduce'
-  provider: string
-  model: string
-  contextWindow: number
-  modelMaxOutputTokens?: number
-  desiredOutputTokens: number
-  outputTokenCap: number
-  directInputTokens: number
-  inputTokenBudget: number
-}
-```
-
-```ts type-equiv
-/** One deterministic direct, map, or reducer input in a range preparation. */
-interface CompactionPreparationChunk {
-  index: number
-  stage: CompactionPreparationStage
-  startSeq: number
-  endSeq: number
-  part: number
-  parts: number
-  estimatedTokens: number
-  inputDigest: string
-}
-```
-
-```ts type-equiv
-/** One provider call recorded before its stream starts. */
-interface CompactionPreparationAttempt {
-  index: number
-  stage: CompactionPreparationStage
-  chunkIndexes: number[]
-  inputTokens: number
-  provider: string
-  model: string
-  maxTokens: number
-}
-```
-
-```ts type-equiv
-/** One completed summarizer call, recorded independently of its completion order. */
-type CompactionPreparationCall = {
-  index: number
-  stage: CompactionPreparationStage
-  chunkIndexes: number[]
-  summary: ContentBlock[]
-  provider: string
-  model: string
-  maxTokens?: number
-  usage?: TokenUsage
-} & (
-  | { rawOutput: ContentBlock[]; llmStreamCall: true }
-  | { rawOutput?: ContentBlock[]; llmStreamCall?: never }
-)
-```
-
-```ts type-equiv
-/** Complete generated preparation ready for review or a revalidated commit. */
-interface CompactionPreparation {
-  request: CompactionPreparationRequest
-  chunks: CompactionPreparationChunk[]
-  calls: CompactionPreparationCall[]
-  summary: ContentBlock[]
-}
-```
-
-Preparation 是持久评审状态，而不是 surface 变更。调用方依次记录 `requested`、容量计划、每次尝试、每次完成调用，最后记录 `ready`；编辑只会替换评审候选。系统根据完整位置局部请求及其动态输出上限判断能否直接放入窗口。Commit 会重新校验请求，并使用普通 bracket。
 
 ## 服务
 
@@ -161,9 +81,7 @@ Preparation 是持久评审状态，而不是 surface 变更。调用方依次�
 type CompactionTrigger = 'pressure' | 'context-overflow'
 ```
 
-`CompactionEngine` 暴露自动 `compactIfNeeded`、空闲 `compactNow`、显式 `compactRegion`、只读 `prepareRegion` 与重新校验的 `commitPrepared`。`compactNow()` 在轮次之间作为 agent maintenance 运行并写入独立 `turn: null` bracket。`commitPrepared()` 接受空闲准入或调用方已经打开的轮次。每个后端都使用 `compactCheckpointSource()` 创建替换消息来源。实现会把取消转发给提供方工作。该 seam 不拥有计价 API：[`ctx.tokenMeter`](token-meter.md) 负责估算与位置范围，`dsh-compaction-basic` 负责保留、事件顺序、direct-fit 规划、map/reduce fallback 及配置。
-
-提供方会向 `ctx.compactions` 注册；`CompactionDirectory.resolve(agent)` 选择准确 Agent 作用域提供方，否则使用进程 fallback。这样 Session Context 会通过 Agent preset 挂载的提供方提交，而不是假设存在某个根实现。
+`CompactionEngine` 暴露 `compactIfNeeded(agent, trigger, signal)` 以执行自动 `pressure` 或 `context-overflow` 策略，暴露 `compactNow(agent, signal)` 以便即使未达到压力也对空闲会话进行一次有效缩减，还针对显式、两端均包含的 surface 范围暴露 `compactRegion(...)`。`compactNow()` 作为轮次之间的 agent maintenance 运行；没有有效范围时返回 `null` 且不写入；在摘要前记录独立的 `turn: null` 标记对，并在后续排队提示词能够从新表层派生前 flush 已闭合尝试。每个后端都使用 `compactCheckpointSource(compactionId, sourceCommandId?)` 创建替换用 `user/message` 的源；client 与 wire 消费方从无 Cordis 的 `@deepseek-ai/dsh-compaction/checkpoint` 子路径导入该构造函数、`CompactionCheckpointSource` 和 `isCompactCheckpointSource()`，包根则为 host 消费方重新导出它们。必填的事务身份会关联替换检查点，而该判定函数使检查点识别不依赖任一特定后端。实现必须把传入的 signal 转发给摘要流程。该 seam 不拥有计价 API：单例 [`ctx.tokenMeter`](token-meter.zh.md) 直接拥有估算与回放，而 `dsh-compaction-basic` 拥有保留策略、事件排序、按路由执行的摘要调用及其配置。
 
 预期的手动失败使用 `ManualCompactionErrorCode`：
 
@@ -178,11 +96,11 @@ type ManualCompactionErrorCode =
   | 'persistence'
 ```
 
-`changed` 和 `summary` 保持会话表层不变，但仍会闭合失败尝试并将其持久化到日志。`commit` 可能发生在部分变更之后；`persistence` 表示内存中的标记对已闭合，但 flush 失败。取消独立于这些失败，并在完成必要清理后抛出原始 abort 原因。
+`changed` 和 `summary` 闭合失败尝试并将其持久化到日志，不写入摘要替换；恢复过程中记录的图片省略仍然有效。`commit` 可能发生在部分变更之后；`persistence` 表示内存中的标记对已闭合，但 flush 失败。取消独立于这些失败，并在完成必要清理后抛出原始 abort 原因。
 
-压力压缩在串行 `agent/pre-step` 中运行，先于请求推导。一旦压力或规范化溢出满足条件，compaction-basic 会在选择范围前调用可选的 [`ctx.toolResultPruner`](../../packages/compaction/compaction-tool-result-pruner/README.md)，再通过 `ctx.tokenMeter` 重新测量，并且可以在不生成摘要的情况下推进 surface。失败请求的恢复在失败的步骤关闭后通过 `agent/request-error` 运行；仅当 surface replacement generation 前进时才返回重试动作，即便后续摘要工作在剪枝后抛异常亦如此；取消仍然优先。区域边界保持工具调用/结果配对，但不保持整个轮次，因此一个过大轮次中较早关闭的步骤可以被压缩。`dsh-compaction-basic` 拥有阈值、保留尾部策略、溢出上限与失败处理。
+压力压缩在 `agent/pre-step` waterfall（瀑布式事件）中运行，先于请求推导。一旦压力或规范化溢出满足条件，compaction-basic 会在选择范围前调用可选的 [`ctx.toolResultPruner`](../../packages/compaction/compaction-tool-result-pruner/README.zh.md)，再通过 `ctx.tokenMeter` 重新测量，并且可以在不生成摘要的情况下推进 surface。失败请求的恢复在失败的步骤关闭后通过 `agent/request-error` 运行；仅当 surface replacement generation 前进时才返回重试动作，即便后续摘要工作在剪枝后抛异常亦如此；取消仍然优先。区域边界保持工具调用/结果配对，但不保持整个轮次，因此一个过大轮次中较早关闭的步骤可以被压缩。`dsh-compaction-basic` 拥有阈值、保留尾部策略、溢出上限与失败处理。
 
-该 Service Definition 导出 `toolPairingBalancedBefore(session, seq)` 与 `toolPairingBalancedAfter(session, seq)`，用于检查 seq 之前与之后的工具调用/结果配对。两者都会验证当前 surface 成员关系，并拒绝缺失的 seq 与遗留结果；[包约定](../../packages/compaction/compaction/README.md#tool-pairing-boundaries)定义其缓存行为。
+该 Service Definition 导出 `toolPairingBalancedBefore(session, seq)` 与 `toolPairingBalancedAfter(session, seq)`，用于检查 seq 之前与之后的工具调用/结果配对。两者都会验证当前 surface 成员关系，并拒绝缺失的 seq 与遗留结果；[包约定](../../packages/compaction/compaction/README.zh.md#tool-pairing-boundaries)定义其缓存行为。
 
 ## 工具结果剪枝产出
 
@@ -192,11 +110,11 @@ type ManualCompactionErrorCode =
 /** Cited source event and size accounting for one landed surface replacement. */
 interface PrunedEntry {
   /** Full-fidelity tool-result event shadowed by the replacement. */
-  readonly originalSeq: number
+  readonly originalSeq: SessionSeq
   /** Newly appended pruned tool-result event. */
-  readonly replacementSeq: number
+  readonly replacementSeq: SessionSeq
   /** Tool call shared by the original and replacement. */
-  readonly callId: CallId
+  readonly callId: ToolCallId
   /** Original text size in Unicode code points. */
   readonly charsBefore: number
   /** Replacement text size in Unicode code points. */
@@ -220,7 +138,7 @@ interface PruneResult {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxcompaction--compactionengine-abstract-seam"></a>
 
@@ -284,64 +202,12 @@ abstract compactNow( agent: ManualCompactAgentContext, signal: AbortSignal, sour
  * @throws when compaction is active or the range is missing, reversed, or unbalanced.
  * @returns the appended event seqs, summary, replaced range, and token accounting.
  */
-abstract compactRegion( start: number, end: number, agent: CompactionAgentContext, signal?: AbortSignal, ): Promise<CompactionResult>
-
-/**
- * Summarize one stable selected range without changing the Session surface.
- * The caller records the request before invoking this method and durably
- * records every progress item before review begins.
- * @param request - exact selected span, pricing, digest, and optional preservation brief.
- * @param agent - Agent whose scoped provider and Session own the preparation.
- * @param signal - cancellation forwarded to every provider call.
- * @param onProgress - called for the capacity plan, each call attempt, and each successful completion.
- * @returns deterministic chunks, every call result, and the final generated summary.
- */
-abstract prepareRegion( request: CompactionPreparationRequest, agent: CompactionAgentContext, signal: AbortSignal, onProgress: (progress: CompactionPreparationProgress) => Promise<void>, ): Promise<CompactionPreparation>
-
-/**
- * Commit one reviewed preparation through short idle maintenance.
- * Implementations revalidate exact selected membership, digest, balance,
- * token price, and summary shrink before appending the standard bracket.
- * @param preparation - generated preparation and provider-call facts.
- * @param summary - reviewed final summary blocks.
- * @param source - whether generated output or a human/model edit is committed.
- * @param admission - idle human maintenance or the caller's already-open model turn.
- * @param agent - idle Agent whose Session is mutated.
- * @param signal - cancellation for admission and persistence work.
- * @returns the committed standard compaction result.
- */
-abstract commitPrepared( preparation: CompactionPreparation, summary: readonly import('@deepseek-ai/dsh-llm').ContentBlock[], source: 'generated' | 'human' | 'model', admission: 'idle' | 'current-turn', agent: ManualCompactAgentContext, signal: AbortSignal, ): Promise<CompactionResult>
+abstract compactRegion( start: SessionSeq, end: SessionSeq, agent: CompactionAgentContext, signal?: AbortSignal, ): Promise<CompactionResult>
 ```
 
-Types: [CommandId](commands.md) · [ContentBlock](llm-streaming.md)
+Types: [CommandId](commands.zh.md) · [SessionSeq](session.zh.md)
 
-Source: [`packages/compaction/compaction/src/index.ts:112`](../../packages/compaction/compaction/src/index.ts)
-
-<a id="ctxcompactions--compactiondirectory"></a>
-
-### `ctx.compactions` — `CompactionDirectory`
-
-Global fallback plus per-Agent providers contributed by isolated presets.
-
-```ts cordis-catalog
-/**
- * Register one provider for an isolated Agent or as the process fallback.
- * @param provider - compaction implementation contributed by one composition.
- * @param agent - owning Agent when the provider lives in an Agent preset.
- * @returns disposer removing only this exact registration.
- */
-register(provider: CompactionEngine, agent?: CompactionAgentContext): () => void
-
-/**
- * Resolve the provider selected by one Agent's composition.
- * @param agent - target Agent.
- * @returns the Agent provider, otherwise the global fallback.
- * @throws when neither composition supplied a provider.
- */
-resolve(agent: CompactionAgentContext): CompactionEngine
-```
-
-Source: [`packages/compaction/compaction/src/directory.ts:13`](../../packages/compaction/compaction/src/directory.ts)
+Source: [`packages/compaction/compaction/src/index.ts`](../../packages/compaction/compaction/src/index.ts)
 
 <a id="ctxtoolresultpruner--toolresultpruner"></a>
 
@@ -381,7 +247,38 @@ pruneContent(blocks: readonly ContentBlock[]): ContentBlock[] | null
 pruneSession(session: Session): PruneResult
 ```
 
-Types: [ContentBlock](llm-streaming.md) · [Session](session.md)
+Types: [ContentBlock](llm-streaming.zh.md) · [Session](session.zh.md)
 
-Source: [`packages/compaction/compaction-tool-result-pruner/src/index.ts:44`](../../packages/compaction/compaction-tool-result-pruner/src/index.ts)
+Source: [`packages/compaction/compaction-tool-result-pruner/src/index.ts`](../../packages/compaction/compaction-tool-result-pruner/src/index.ts)
+
+<a id="compaction-events"></a>
+
+### `compaction/*` events
+
+<a id="compactionsummary-error--waterfall"></a>
+
+#### `compaction/summary-error` — waterfall
+
+Recover a failed summary request by synchronously recording a durable change to its selected input. Return true only after making progress; the provider re-derives and re-prices the selection before retrying. Call next() when the failure cannot be recovered. Decisions survive a later summary failure or cancellation.
+
+```ts cordis-catalog
+/**
+ * Recover a failed summary request by synchronously recording a durable
+ * change to its selected input. Return true only after making progress;
+ * the provider re-derives and re-prices the selection before retrying.
+ * Call next() when the failure cannot be recovered. Decisions survive a
+ * later summary failure or cancellation.
+ * @param payload.session - session containing the selected input.
+ * @param payload.sourceEventSeqs - selected message events in request order.
+ * @param payload.error - failure thrown by the summarizer.
+ * @param payload.signal - optional compaction cancellation signal.
+ * @param next - delegate to the next recovery listener.
+ * @mode waterfall
+ */
+'compaction/summary-error'(payload: { session: Session; sourceEventSeqs: readonly SessionSeq[]; error: unknown; signal?: AbortSignal }, next: () => boolean): boolean
+```
+
+Types: [Session](session.zh.md) · [SessionSeq](session.zh.md)
+
+Source: [`packages/compaction/compaction/src/index.ts`](../../packages/compaction/compaction/src/index.ts)
 <!-- END GENERATED cordis-surface -->

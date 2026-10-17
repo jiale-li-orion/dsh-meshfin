@@ -15,18 +15,18 @@ import { isArchivedAgentNotePath, uniqueRepoFiles } from './repo-files.ts'
 const root = resolve(import.meta.dirname, '..')
 
 /** Files to check: doc-typecheck's scope, system-prompt expected outputs, and the AGENTS.md pair. */
-export const MARKDOWN_WRAP_PATTERNS = [
+const PATTERNS = [
   'README.md',
   'README.zh.md',
   '.agents/notes/**/*.md',
   'docs/**/*.md',
   'packages/*/*.md',
   'packages/*/*/*.md',
-  'examples/**/system-prompt.expected.md',
+  'snapshots/**/system-prompt.expected.md',
   'packages/**/system-prompt.expected.md',
   'AGENTS.md',
   'packages/AGENTS.md',
-  'community/**/*.md',
+  'snapshots/AGENTS.md',
 ]
 
 /** A located hard-wrap: a prose paragraph spanning more than one source line. */
@@ -70,20 +70,17 @@ function findViolations(absPath: string): Violation[] {
   return out
 }
 
-// Run only when invoked as a script, not when imported by the spec.
-if (process.argv[1] && import.meta.filename === resolve(process.argv[1])) {
-  const files = uniqueRepoFiles(root, MARKDOWN_WRAP_PATTERNS, isArchivedAgentNotePath)
-  const all = files.flatMap(file => findViolations(file.abs))
-  const checked = files.length
+const files = uniqueRepoFiles(root, PATTERNS, isArchivedAgentNotePath)
+const all = files.flatMap(file => findViolations(file.abs))
+const checked = files.length
 
-  if (all.length === 0) {
-    console.log(`verify-md-wrap: ${checked} file(s) checked, no hard-wrapped prose paragraphs.`)
-    process.exit(0)
-  }
-
-  console.error('verify-md-wrap: hard-wrapped prose paragraphs found (write one physical line per paragraph):')
-  for (const v of all) {
-    console.error(`  ${v.file}:${v.line}  ${v.text.slice(0, 80)}${v.text.length > 80 ? '…' : ''}`)
-  }
-  process.exit(1)
+if (all.length === 0) {
+  console.log(`verify-md-wrap: ${checked} file(s) checked, no hard-wrapped prose paragraphs.`)
+  process.exit(0)
 }
+
+console.error('verify-md-wrap: hard-wrapped prose paragraphs found (write one physical line per paragraph):')
+for (const v of all) {
+  console.error(`  ${v.file}:${v.line}  ${v.text.slice(0, 80)}${v.text.length > 80 ? '…' : ''}`)
+}
+process.exit(1)

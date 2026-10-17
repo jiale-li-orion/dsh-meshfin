@@ -2,106 +2,17 @@
  * Compaction vocabulary: the result type and the `compaction/*` session events.
  * Those declaration-merged events record the lock and summary inputs without entering the surface, so they are not
  * surface events; a separate replacement `user/message` carries the summary.
- * Backend packages own configuration and retention policy; see
- * `.agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md`.
+ * Backend packages own configuration and retention policy; see the
+ * [compaction reference](../README.md#understand-the-implementation).
  * @module @deepseek-ai/dsh-compaction/types
  */
 
 import type { ContentBlock, TokenUsage } from '@deepseek-ai/dsh-llm'
 import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
-import type { CompactionId, CompactionPreparationId } from './brand.ts'
+import type { SessionSeq } from '@deepseek-ai/dsh-session/types'
+import type { CompactionId } from './brand.ts'
 
-export type { CompactionId, CompactionPreparationId }
-
-/** Stable selected-span facts recorded before range summarization starts. */
-export interface CompactionPreparationRequest {
-  preparationId: CompactionPreparationId
-  start: number
-  end: number
-  shadowedSeqs: number[]
-  shadowedDigest: string
-  shadowedTokenCount: number
-  unitCount: number
-  preservationBrief?: string
-}
-
-/** Summarizer stage for one reviewed range preparation request. */
-export type CompactionPreparationStage = 'direct' | 'map' | 'reduce'
-
-/** Capacity-derived plan recorded before a range preparation makes provider calls. */
-export interface CompactionPreparationPlan {
-  strategy: 'direct' | 'map-reduce'
-  provider: string
-  model: string
-  contextWindow: number
-  modelMaxOutputTokens?: number
-  desiredOutputTokens: number
-  outputTokenCap: number
-  directInputTokens: number
-  inputTokenBudget: number
-}
-
-/** One deterministic direct, map, or reducer input in a range preparation. */
-export interface CompactionPreparationChunk {
-  index: number
-  stage: CompactionPreparationStage
-  startSeq: number
-  endSeq: number
-  part: number
-  parts: number
-  estimatedTokens: number
-  inputDigest: string
-}
-
-/** One provider call recorded before its stream starts. */
-export interface CompactionPreparationAttempt {
-  index: number
-  stage: CompactionPreparationStage
-  chunkIndexes: number[]
-  inputTokens: number
-  provider: string
-  model: string
-  maxTokens: number
-}
-
-/** One completed summarizer call, recorded independently of its completion order. */
-export type CompactionPreparationCall = {
-  index: number
-  stage: CompactionPreparationStage
-  chunkIndexes: number[]
-  summary: ContentBlock[]
-  provider: string
-  model: string
-  maxTokens?: number
-  usage?: TokenUsage
-} & (
-  | { rawOutput: ContentBlock[]; llmStreamCall: true }
-  | { rawOutput?: ContentBlock[]; llmStreamCall?: never }
-)
-
-/** Complete generated preparation ready for review or a revalidated commit. */
-export interface CompactionPreparation {
-  request: CompactionPreparationRequest
-  chunks: CompactionPreparationChunk[]
-  calls: CompactionPreparationCall[]
-  summary: ContentBlock[]
-}
-
-/** Durable progress emitted before and during range preparation calls. */
-export type CompactionPreparationProgress =
-  | {
-    kind: 'planned'
-    plan: CompactionPreparationPlan
-    chunks: CompactionPreparationChunk[]
-  }
-  | {
-    kind: 'attempt'
-    attempt: CompactionPreparationAttempt
-  }
-  | {
-    kind: 'call'
-    call: CompactionPreparationCall
-  }
+export type { CompactionId }
 
 declare module '@deepseek-ai/dsh-session/types' {
   interface SessionEventMap {
@@ -110,12 +21,7 @@ declare module '@deepseek-ai/dsh-session/types' {
      * `compaction/end`. A numbered owner is strictly enclosed by that open turn;
      * `null` identifies a standalone manual transaction between turns.
      */
-    'compaction/start': {
-      compactionId: CompactionId
-      sourceCommandId?: CommandId
-      preparationId?: CompactionPreparationId
-      turn: number | null
-    }
+    'compaction/start': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null }
     /**
      * Completed summary, its inputs, and its model call facts — log-only, no surfaceOp.
      * The summary content is in `data.summary`; the actual surface replacement
@@ -128,11 +34,9 @@ declare module '@deepseek-ai/dsh-session/types' {
     'compaction/summary': {
       compactionId: CompactionId
       sourceCommandId?: CommandId
-      preparationId?: CompactionPreparationId
-      summarySource?: 'generated' | 'human' | 'model'
       summary: ContentBlock[]
-      shadowedRange: { start: number; end: number }
-      shadowedSeqs: number[]
+      shadowedRange: { start: SessionSeq; end: SessionSeq }
+      shadowedSeqs: SessionSeq[]
       shadowedTokenCount: number
       /** The provider route that wrote the summary. */
       provider: string
@@ -165,13 +69,7 @@ declare module '@deepseek-ai/dsh-session/types' {
      * Marks the end of a compaction — log-only, releases the lock. Its owner
      * matches `compaction/start`; `error` records an unsuccessful attempt.
      */
-    'compaction/end': {
-      compactionId: CompactionId
-      sourceCommandId?: CommandId
-      preparationId?: CompactionPreparationId
-      turn: number | null
-      error?: string
-    }
+    'compaction/end': { compactionId: CompactionId; sourceCommandId?: CommandId; turn: number | null; error?: string }
     /**
      * Shadow price of one model-free prune replacement — log-only, no
      * surfaceOp. The shared shadow-price protocol: a surface `replace` event
@@ -183,52 +81,11 @@ declare module '@deepseek-ai/dsh-session/types' {
      */
     'compaction/prune': {
       /** The replaced range's first and last surface-node seqs (a surface-position span, like {@link CompactionResult.shadowedRange}). */
-      shadowedRange: { start: number; end: number }
+      shadowedRange: { start: SessionSeq; end: SessionSeq }
       /** The seqs of all shadowed surface nodes, in surface order. */
-      shadowedSeqs: number[]
+      shadowedSeqs: SessionSeq[]
       /** Heuristic price of the shadowed content under the token-meter's fixed estimator. */
       shadowedTokenCount: number
-    }
-    /** Durable range selection recorded before any preparation provider call. */
-    'compaction/preparation/requested': CompactionPreparationRequest
-    /** Capacity-derived strategy and initial deterministic chunks. */
-    'compaction/preparation/planned': {
-      preparationId: CompactionPreparationId
-      plan: CompactionPreparationPlan
-      chunks: CompactionPreparationChunk[]
-    }
-    /** One provider call recorded before its stream starts. */
-    'compaction/preparation/attempted': {
-      preparationId: CompactionPreparationId
-      attempt: CompactionPreparationAttempt
-    }
-    /** One completed direct, map, or reduction call in a durable preparation. */
-    'compaction/preparation/call': {
-      preparationId: CompactionPreparationId
-      call: CompactionPreparationCall
-    }
-    /** Generated summary and deterministic chunk plan ready for review. */
-    'compaction/preparation/ready': {
-      preparationId: CompactionPreparationId
-      chunks: CompactionPreparationChunk[]
-      summary: ContentBlock[]
-    }
-    /** Review-time summary replacement; the latest edit is the commit candidate. */
-    'compaction/preparation/edited': {
-      preparationId: CompactionPreparationId
-      summary: ContentBlock[]
-      source: 'human' | 'model'
-    }
-    /** Terminal preparation failure before surface mutation. */
-    'compaction/preparation/failed': {
-      preparationId: CompactionPreparationId
-      error: string
-      /** Exact attempted-call count when the producer records this newer diagnostic. */
-      attemptedCalls?: number
-    }
-    /** Review discarded a ready or failed preparation without changing the surface. */
-    'compaction/preparation/discarded': {
-      preparationId: CompactionPreparationId
     }
   }
 }
@@ -240,11 +97,11 @@ export interface CompactionResult {
   /** Human command that initiated this compaction, when it was manual. */
   sourceCommandId?: CommandId
   /** The seq of the appended `compaction/start` event. */
-  startSeq: number
+  startSeq: SessionSeq
   /** The seq of the appended `compaction/summary` event. */
-  summarySeq: number
+  summarySeq: SessionSeq
   /** The seq of the appended `compaction/end` event. */
-  endSeq: number
+  endSeq: SessionSeq
   /** The summary content blocks produced by the backend. */
   summary: ContentBlock[]
   /**
@@ -255,9 +112,9 @@ export interface CompactionResult {
    * can be GREATER than `end`. {@link CompactionResult.shadowedSeqs} is the
    * authoritative set of shadowed nodes, in surface order.
    */
-  shadowedRange: { start: number; end: number }
+  shadowedRange: { start: SessionSeq; end: SessionSeq }
   /** The seqs of all shadowed surface nodes, in surface order. */
-  shadowedSeqs: number[]
+  shadowedSeqs: SessionSeq[]
   /** Estimated token count of the shadowed content. */
   shadowedTokenCount: number
 }

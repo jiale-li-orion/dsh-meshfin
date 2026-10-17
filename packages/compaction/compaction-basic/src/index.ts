@@ -7,17 +7,11 @@
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import { CompactionEngine, ManualCompactionError } from '@deepseek-ai/dsh-compaction'
-import type {
-  CompactionPreparation,
-  CompactionPreparationProgress,
-  CompactionPreparationRequest,
-  CompactionResult,
-  CompactionTrigger,
-} from '@deepseek-ai/dsh-compaction'
-import type { TokenMeter } from '@deepseek-ai/dsh-token-meter'
-import type { Session } from '@deepseek-ai/dsh-session'
-import { CONTEXT_WINDOW_EXCEEDED_CODE, assertNever } from '@deepseek-ai/dsh-llm'
+import type { CompactionResult, CompactionTrigger } from '@deepseek-ai/dsh-compaction'
+import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
+import { CONTEXT_WINDOW_EXCEEDED_CODE } from '@deepseek-ai/dsh-llm'
 import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
+import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
 // Type-only: makes the optional sibling service available to `ctx.get()`.
@@ -30,18 +24,11 @@ import {
 } from './config.ts'
 import {
   assertNoActiveCompaction,
-  commitPreparedSurfaceRegion,
   compactSurfaceRegion,
   selectCompactableRange,
 } from './region.ts'
-import { prepareSurfaceRegion } from './preparation.ts'
-import { resolveSummarizationTarget, summarizeWithLlm } from './summarizer.ts'
-import type {
-  SummarizationInput,
-  SummarizationTarget,
-  SummaryConfig,
-  SummaryResult,
-} from './summarizer.ts'
+import { summarizeWithLlm } from './summarizer.ts'
+import type { SummarizationInput, SummaryResult } from './summarizer.ts'
 import type {
   BasicCompactionConfig,
   ModelCompactPolicyConfig,
@@ -58,22 +45,6 @@ export type {
   ResolvedTargetPolicy,
 } from './types.ts'
 
-/** The region transaction's view of this service's dynamically dispatched summarizer. */
-type RegionSummarize = (
-  input: SummarizationInput,
-  agent: Agent,
-  signal?: AbortSignal,
-  maxTokens?: number,
-) => Promise<SummaryResult>
-
-/** Resolved summarization capacity used to plan reviewed range calls. */
-interface PreparationTarget {
-  readonly provider: string
-  readonly model: string
-  readonly contextWindow: number
-  readonly maxOutputTokens?: number
-}
-
 /** Resolve the exact provider/model durably routed for the latest request. */
 function routedTarget(
   session: Session,
@@ -83,6 +54,17 @@ function routedTarget(
     return undefined
   }
   return { provider: config.provider, model: config.model }
+}
+
+/**
+ * Output tokens the routed request reserves, which the provider charges to the
+ * same window as the prompt. The effective envelope's own cap wins; otherwise
+ * the adapter's per-request default, which the adapter materializes when that
+ * envelope omits one. No declared cap means no reservation.
+ */
+function reservedCompletionTokens(agent: Agent, defaultMaxTokens: number | undefined): number {
+  const configured = agent.session.requestHeader()?.config.maxTokens
+  return configured ?? defaultMaxTokens ?? 0
 }
 
 /** Resolve the conversation target used to select an optional policy override. */
@@ -97,6 +79,7 @@ function conversationTarget(
 }
 
 const thresholdRatioSchema = z.number()
+const headroomTokensSchema = z.number().step(1).min(0)
 const retainRatioSchema = z.number()
 const retainTokensSchema = z.number().step(1).min(0)
 const summarizationProviderSchema = z.string()
@@ -104,14 +87,12 @@ const summarizationModelSchema = z.string()
 const maxTokensSchema = z.number().step(1).min(1)
 const compactionRetriesSchema = z.number().step(1).min(0)
 const maxOverflowRetriesSchema = z.number().step(1).min(0)
-const preparationOutputRatioSchema = z.number().min(Number.MIN_VALUE).max(1)
-const preparationOutputTokensSchema = z.number().step(1).min(1)
-const preparationConcurrencySchema = z.number().step(1).min(1)
 
 const modelPolicy: z<ModelCompactPolicyConfig> = z.object({
   provider: z.string().required(),
   model: z.string().required(),
   thresholdRatio: thresholdRatioSchema,
+  headroomTokens: headroomTokensSchema,
   retainRatio: retainRatioSchema,
   retainTokens: retainTokensSchema,
   summarizationProvider: summarizationProviderSchema,
@@ -119,10 +100,6 @@ const modelPolicy: z<ModelCompactPolicyConfig> = z.object({
   maxTokens: maxTokensSchema,
   compactionRetries: compactionRetriesSchema,
   maxOverflowRetries: maxOverflowRetriesSchema,
-  preparationOutputRatio: preparationOutputRatioSchema,
-  preparationMinOutputTokens: preparationOutputTokensSchema,
-  preparationMaxOutputTokens: preparationOutputTokensSchema,
-  preparationConcurrency: preparationConcurrencySchema,
 })
 
 /**
@@ -138,6 +115,7 @@ export class BasicCompactionEngine extends CompactionEngine {
 
   static Config: z<BasicCompactionConfig> = z.object({
     thresholdRatio: thresholdRatioSchema,
+    headroomTokens: headroomTokensSchema,
     retainRatio: retainRatioSchema,
     retainTokens: retainTokensSchema,
     summarizationProvider: summarizationProviderSchema,
@@ -145,10 +123,6 @@ export class BasicCompactionEngine extends CompactionEngine {
     maxTokens: maxTokensSchema,
     compactionRetries: compactionRetriesSchema,
     maxOverflowRetries: maxOverflowRetriesSchema,
-    preparationOutputRatio: preparationOutputRatioSchema,
-    preparationMinOutputTokens: preparationOutputTokensSchema,
-    preparationMaxOutputTokens: preparationOutputTokensSchema,
-    preparationConcurrency: preparationConcurrencySchema,
     modelPolicies: z.array(modelPolicy),
     auto: z.boolean(),
   })
@@ -268,58 +242,18 @@ export class BasicCompactionEngine extends CompactionEngine {
    * @param input - replayed conversation prefix (system, tools, and leading messages) to condense.
    * @param agent - supplies routed-model history, fallback model, and session id.
    * @param signal - optional cancellation forwarded to the adapter.
-   * @param maxTokens - optional operation-specific output cap.
-   * @param targetOverride - optional stable provider/model route for a reviewed preparation.
    * @returns safe text summary blocks and the exact auxiliary call envelope and output.
    */
   protected async summarize(
     input: SummarizationInput,
     agent: Agent,
     signal?: AbortSignal,
-    maxTokens?: number,
-    targetOverride?: SummarizationTarget,
   ): Promise<SummaryResult> {
     const target = conversationTarget(agent)
     const config = target === undefined
       ? this.config
       : resolveTargetPolicy(this.config, target)
-    const effective = targetOverride === undefined
-      ? config
-      : {
-        ...config,
-        summarizationProvider: targetOverride.provider,
-        summarizationModel: targetOverride.model,
-      }
-    return summarizeWithLlm(this.ctx, effective, input, agent, signal, maxTokens ?? config.maxTokens)
-  }
-
-  /**
-   * Resolve the exact summarization model capacity used for reviewed ranges.
-   * A subclass whose summarizer does not use `ctx.llm` overrides this together
-   * with {@link BasicCompactionEngine.summarize}.
-   * @param config - effective policy that selects the summarization route.
-   * @param agent - owner supplying durable and fallback routes.
-   * @param signal - cancellation for adapter-owned metadata lookup.
-   * @returns the exact route, context capacity, and optional output capability.
-   */
-  protected async resolvePreparationTarget(
-    config: SummaryConfig,
-    agent: Agent,
-    signal: AbortSignal,
-  ): Promise<PreparationTarget> {
-    const target = resolveSummarizationTarget(config, agent)
-    const model = await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)
-    const contextWindow = model.context?.contextWindow
-    if (contextWindow === undefined) {
-      throw new Error(
-        `range compaction requires context capacity for ${target.provider}/${target.model}`,
-      )
-    }
-    return {
-      ...target,
-      contextWindow,
-      ...model.maxOutputTokens === undefined ? {} : { maxOutputTokens: model.maxOutputTokens },
-    }
+    return summarizeWithLlm(this.ctx, config, input, agent, signal)
   }
 
   /**
@@ -367,17 +301,21 @@ export class BasicCompactionEngine extends CompactionEngine {
       return this.compactRegion(range.start, range.end, agent, signal)
     }
 
-    const context = (await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)).context
+    const info = await this.ctx.llm.resolveModelInfo(target.provider, target.model, signal)
     assertNoActiveCompaction(agent.session, 'automatic pressure compaction')
     const targetKey = `${target.provider}/${target.model}`
-    if (context === undefined) {
+    if (info.context === undefined) {
       throw new TargetPressureConfigError(
         targetKey,
         `compaction-basic: no context capacity for ${targetKey}; `
         + 'configure contextWindow on that adapter model',
       )
     }
-    const spec = resolveCompactSpec(policy, context.contextWindow)
+    const spec = resolveCompactSpec(
+      policy,
+      info.context.contextWindow,
+      reservedCompletionTokens(agent, info.defaultMaxTokens),
+    )
     if (measurement.totalTokens < spec.thresholdTokens) return null
 
     // Once pressure qualifies, land the model-free pass before choosing a
@@ -418,8 +356,8 @@ export class BasicCompactionEngine extends CompactionEngine {
    * @returns the successful durable compaction result.
    */
   override async compactRegion(
-    start: number,
-    end: number,
+    start: SessionSeq,
+    end: SessionSeq,
     agent: Agent,
     signal?: AbortSignal,
   ): Promise<CompactionResult> {
@@ -496,83 +434,17 @@ export class BasicCompactionEngine extends CompactionEngine {
     }
   }
 
-  /** Prepare one reviewed range without changing its current surface membership. */
-  override async prepareRegion(
-    request: CompactionPreparationRequest,
-    agent: Agent,
-    signal: AbortSignal,
-    onProgress: (progress: CompactionPreparationProgress) => Promise<void>,
-  ): Promise<CompactionPreparation> {
-    const target = conversationTarget(agent)
-    const policy = target === undefined ? this.config : resolveTargetPolicy(this.config, target)
-    const preparationTarget = await this.resolvePreparationTarget(policy, agent, signal)
-    return prepareSurfaceRegion({
-      meter: this.ctx.tokenMeter,
-      target: preparationTarget,
-      outputRatio: policy.preparationOutputRatio,
-      minOutputTokens: policy.preparationMinOutputTokens,
-      maxOutputTokens: policy.preparationMaxOutputTokens,
-      concurrency: policy.preparationConcurrency,
-      summarize: (input, maxTokens, owner, abort) => this.summarize(
-        input,
-        owner,
-        abort,
-        maxTokens,
-        preparationTarget,
-      ),
-    }, request, agent, signal, onProgress)
-  }
-
-  /** Commit one reviewed preparation through short idle maintenance and flush it. */
-  override commitPrepared(
-    preparation: CompactionPreparation,
-    summary: readonly import('@deepseek-ai/dsh-llm').ContentBlock[],
-    source: 'generated' | 'human' | 'model',
-    admission: 'idle' | 'current-turn',
-    agent: Agent,
-    signal: AbortSignal,
-  ): Promise<CompactionResult> {
-    signal.throwIfAborted()
-    if (admission === 'current-turn') {
-      return commitPreparedSurfaceRegion(
-        this.regionDependencies(),
-        preparation,
-        summary,
-        source,
-        'current-turn',
-        agent,
-        signal,
-      )
-    }
-    try {
-      return agent.runMaintenance(async (agentSignal) => {
-        const operationSignal = AbortSignal.any([agentSignal, signal])
-        operationSignal.throwIfAborted()
-        return commitPreparedSurfaceRegion(
-          this.regionDependencies(),
-          preparation,
-          summary,
-          source,
-          null,
-          agent,
-          operationSignal,
-          async () => { await this.ctx.sessions.flush(agent.session) },
-        )
-      })
-    } catch (error: unknown) {
-      throw new ManualCompactionError(
-        'busy',
-        'prepared compaction requires an idle agent with no waking queued work',
-        { cause: error },
-      )
-    }
-  }
-
   /** Bind the effective token meter and dynamically dispatched summarizer hook. */
-  private regionDependencies(): { meter: TokenMeter; summarize: RegionSummarize } {
+  private regionDependencies(): Parameters<typeof compactSurfaceRegion>[0] {
     return {
       meter: this.ctx.tokenMeter,
       summarize: (input, owner, abort) => this.summarize(input, owner, abort),
+      recover: (error, agent, sourceEventSeqs, signal) => this.ctx.waterfall('compaction/summary-error', {
+        session: agent.session,
+        sourceEventSeqs,
+        error,
+        ...signal === undefined ? {} : { signal },
+      }, () => false),
     }
   }
 }

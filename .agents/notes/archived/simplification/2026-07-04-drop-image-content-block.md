@@ -1,7 +1,7 @@
 # Agent Note: Drop the `image` content block until a path can honor it
 
 Status: implemented
-Archived: 2026-09-09
+Archived: 2026-08-19
 
 English | [中文](2026-07-04-drop-image-content-block.zh.md)
 

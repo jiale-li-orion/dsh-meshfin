@@ -1,75 +1,141 @@
+---
+description: "The one-shot Claude Code subagent provider for users and maintainers choosing a product backend, installing a Profile bundle, or configuring an unattended Claude Code delegation."
+kind: "package-bundle"
+---
+
 # @deepseek-ai/dsh-subagent-claude-code
 
 English | [中文](README.zh.md)
 
-This package registers the fixed `claude-code` subagent provider. Each accepted run invokes the official Claude Agent SDK in the delegating Session's workspace, resolves the native `claude` executable through the shared subprocess service, submits one self-contained text task, and returns only the final answer through the shared [`dsh-subagent`](../subagent/README.md) result contract.
+## Summary
 
-## Start and ownership
+Install this Profile Bundle when a delegated task should run as a fresh, unattended Claude Code session in the parent workspace. Each run accepts one self-contained text task and returns the final answer or a safe failure diagnostic; reasoning, tool traffic, stderr, usage, and workspace diffs stay out of the parent Session. Native Claude settings and authentication remain authoritative, while Profile configuration selects the model, environment, and `permissionMode`. The platform-pinned runtime starts on demand and never falls back to the host `claude` executable. Choose it when isolation and genuine Claude Code behavior matter more than continuation or prompts.
 
-`start(request)` accepts only a non-empty sequence of text blocks and derives the child cwd from the parent Session. It creates one private `AbortController`, calls the official SDK `query()`, and publishes the run only after the SDK's `spawnClaudeCodeProcess` hook has supplied a live CLI handle owned by [`dsh-subprocess`](../../subprocess/subprocess/README.md). A failure or cancellation before publication closes the query, terminates any acquired process tree, waits for it to exit, and rejects `start()`.
+## Table of Contents
 
-The SDK receives the exact concatenated text task. The provider iterates the complete SDK message stream and accepts only a `result` message with `subtype: "success"`, `is_error: false`, and a nonblank `result`, followed by normal iterator completion. Every SDK error subtype, an error-marked success, a missing answer, iterator failure, protocol failure, or process failure maps to `error`; the provider produces neither `max-tokens` nor `refusal`.
+- [Use this package](#use-this-package)
+- [Understand the implementation](#understand-the-implementation)
+- [Further Exploration](#further-exploration)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
-Local cancellation wins the result race and maps to `aborted`. `dispose()` is idempotent: it aborts the run, asks the SDK query to close, invokes the shared process-tree termination escalation, and waits for whole-tree exit. SDK graceful close expresses protocol intent; the subprocess handle remains the authority for process quiescence. Result failure and independent teardown failure remain separate.
+-----
 
-## Native settings and interaction
+<a id="use-this-package"></a>
+## Use this package
 
-The provider deliberately omits the SDK `settingSources` option. The official SDK therefore reads the host's normal user, project, and local Claude settings relative to the parent Session cwd, including native account state and product configuration. The provider neither copies nor filters those files and does not create or modify login state.
+Enable **Claude Code subagent** in the Web or Desktop Plugins page when a task needs a fresh native Claude Code session in the parent workspace.
 
-Each query sets `persistSession: false` and disables `AskUserQuestion`. It supplies no `canUseTool`, elicitation, or dialog callback, so unattended interactions fail through the SDK instead of waiting for a user interface this provider does not own.
+### Installing the Bundle
 
-## Capabilities and context
+The Official entry is visible offline. Enabling it installs the [target for the running DSH installation](../../boot/plugin-manager/README.md#use-this-package) through the ordinary bundle installer and selects its profile layer. The layer registers the provider and adds `subagent_claude_code` to every Agent as a global tool; it starts no native process until delegation. Restart when the installer reports that one is required.
 
-The provider advertises no optional start-time capabilities and reports `inheritsParentContext: false`. Claude Code receives the standalone text task and the parent Session cwd, but not the parent conversation, persona, tool filter, depth policy, or structured-output contract. Every run has an independent SDK query, cancellation controller, CLI process, and non-persisted product session.
+Switching Off deselects the layer and leaves the package installed. Remove is a separate package operation. Enabling or switching Off registers or removes the global tool in the running Host, so live Agents see the change on their next request.
 
-## Configuration
+The layer inserts Host rows only, so any profile can select it, including the shipped headless, SDK, and ACP profiles. Existing provider-only consumers follow the [upgrade guide](../../../docs/upgrade-guide/v0.2.1-alpha.1/native-subagent-bundle-tools/guide.md).
 
-| Key | Default | Meaning |
+### Configuration
+
+| Field | Default | Meaning |
 |---|---|---|
-| `env` | `{}` | Explicit SDK/CLI environment layered over the shared credential-scrubbed parent environment. |
-| `disposeGraceMs` | `3000` | Positive finite grace in milliseconds, no greater than [`MAX_TIMER_DELAY_MS`](../../util/timeout/README.md), between the shared process-tree owner's termination tiers; disposal then waits for whole-tree exit. |
+| `providerName` | `claude-code` | Non-empty registry name on `ctx.subagents`; each mounted instance needs a unique value |
+| `model` | native Claude settings | Optional non-empty model name fixed for every run from this provider instance; omission sends no SDK override |
+| `env` | `{}` | Explicit SDK/CLI environment layered over the credential-scrubbed parent environment |
+| `permissionMode` | `dontAsk` | Native non-interactive permission policy fixed for every run from this provider instance |
+| `disposeGraceMs` | `3000` | Grace between the shared managed-range owner's termination tiers |
 
-Production resolves `claude` from the subprocess execution world's credential-scrubbed `PATH`, with explicit `env` entries applied, and passes the resulting path to the SDK as `pathToClaudeCodeExecutable`. On Windows, a resolved `.cmd` or `.bat` path is carried as a quoted, per-spawn environment value that `cmd.exe /v:off` expands once, so valid path metacharacters remain data. The pinned SDK's fixed flags then occupy cmd's command tail and contain no cmd metacharacters; they are not ordinary Windows argv. Native settings and authentication remain authoritative. The plugin does not install another CLI, select a model, create a product home, log in, or probe an account. Credential-shaped ambient variables are removed before the explicit `env` overlay is applied, so an API key or token intended for the child must be supplied there. Non-credential endpoint variables such as `ANTHROPIC_BASE_URL`, along with ordinary ambient values such as `PATH` and `HOME`, remain inherited unless overridden.
+| `permissionMode` value | Native behavior |
+|---|---|
+| `dontAsk` | Deny operations that are not already authorized instead of prompting |
+| `acceptEdits` | Accept file edits; any remaining permission prompt is denied by the unattended callback |
+| `auto` | Let Claude Code's native classifier allow or deny permission requests |
+| `plan` | Run in native planning mode, deny execution approval, and return the completed plan as the final answer |
+| `bypassPermissions` | Explicitly set the SDK's dangerous confirmation and bypass permission checks |
 
-Production `dsh` does not install or mount this optional provider. A Profile that opts in must install `@deepseek-ai/dsh-subagent-claude-code` and mount it once on the host plane; loading the provider starts no Claude process until a tool call. Full Agent Presets carry a matching product tool row with `disabled: true`; copy a preset and remove that field to expose `subagent_claude_code` only to agents composed from the copy. Its `one-shot` policy keeps omitted or `false` `run_in_background` calls in the foreground, while explicit `true` returns a parent-owned Job id for `job_output` or `job_kill`. The base host and full presets already provide the generic Job registry and controls.
+The generated [configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-claude-code) is the exhaustive source for every accepted field and its JSDoc. A configured `model` passes unchanged to every query from that provider instance; omission leaves native model selection in force. Credential-shaped ambient variables are removed before the explicit `env` overlay, so an API key intended for the child must be supplied there. The provider omits the SDK `settingSources` option, so Claude Code reads the host's normal user, project, and local settings relative to the selected child working directory. It does not copy or filter those files, create or modify login state, inspect `PATH`, or fall back to a host `claude` executable.
 
-The standalone composition below shows the complete explicit capability. A Profile based on `@deepseek-ai/dsh-base` keeps its existing Job rows, adds the product provider row, and enables the preset tool row instead of mounting duplicate Job services.
+<a id="exposing-the-tool"></a>
+### Exposing the tool
+
+The bundle inserts `tool-subagent-claude-code` as a Host row, so `subagent_claude_code` is a global tool visible to every preset, including minimal. Later user patches can configure or disable that row by id. A preset that registers its own tool with the same name shadows the global tool for its Agents. To mount the provider and tool without selecting the bundle layer, insert the same rows in `cordis.patch.yml`:
 
 ```yaml
-- id: subagent-claude-code
-  name: '@deepseek-ai/dsh-subagent-claude-code'
-  config:
-    env:
-      ANTHROPIC_API_KEY: !!js process.env.ANTHROPIC_API_KEY
-
-- id: jobs
-  name: '@deepseek-ai/dsh-jobs-local'
-
-- id: tool-jobs
-  name: '@deepseek-ai/dsh-tool-jobs'
-
-- id: tool-subagent-claude-code
-  name: '@deepseek-ai/dsh-tool-subagent'
-  config:
-    provider: claude-code
-    toolName: subagent_claude_code
-    backgroundMode: one-shot
-    maxDepth: provider-managed
+- insert:
+    - id: subagent-claude-code
+      name: '@deepseek-ai/dsh-subagent-claude-code'
+    - id: tool-subagent-claude-code
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: claude-code
+        toolName: subagent_claude_code
+        maxDepth: provider-managed
 ```
 
-## Product compatibility and evidence
+The tool returns a child id after accepting the task and sends its result to the parent Agent on completion. Each external activation executes once and accepts no follow-up input or resume.
 
-The runtime dependency is pinned to `@anthropic-ai/claude-agent-sdk@0.3.220`. Production runs the native `claude` installation. The keyless real-product test uses the SDK-distributed Claude Code 2.1.220 CLI as a deterministic fixture, routed through the same native executable-resolution and Windows batch-shim path; it does not claim compatibility with every independently installed version. Loader composition proves that both product packages coexist without starting either product.
+### What you get
 
-The project owner's identity-scoped distribution authorization covers the official SDK and the official CLI/platform payloads declared by each SDK version. [`THIRD_PARTY_NOTICES.md`](../../../THIRD_PARTY_NOTICES.md) discloses the current optional payload closure without classifying its declared terms as permissive; unrelated non-permissive runtime dependencies continue to fail the notices gate.
+The completion notice contains the final Claude Code answer, or the stop reason and optional safe diagnostic. The parent Session also retains the external task identity and complete terminal result independently of the notice; no local child Session is created. Product reasoning, tool activity, raw stderr, and workspace diffs do not enter the parent Session.
 
+### Failure and recovery
+
+An install that omits optional dependencies, uses an unsupported platform, or loses the selected payload leaves the provider dormant and fails the first delegation at the SDK startup boundary with a safe `query-start` / `unknown` failure fact; there is no host-CLI fallback. The original product error stays on the internal cause chain and in the provider's Host log. A cancelled run settles as `aborted`.
+
+-----
+
+<a id="understand-the-implementation"></a>
+## Understand the implementation
+
+<details>
+<summary>Implementation internals — click to expand</summary>
+
+This section explains how the provider drives a real Claude Code CLI and where the observable behavior comes from; the full contract lives in [Use this package](#use-this-package).
+
+### Design concept
+
+- **One fresh query per run.** Every run has an independent SDK query, cancellation controller, CLI process, and non-persisted product session; there is no continuation, resume, or pooling.
+- **Native settings are authoritative.** The provider deliberately omits the SDK `settingSources` option, so Claude Code reads the host's normal user, project, and local settings; an optional `model` and the required `permissionMode` are the only query-level overrides.
+- **Unattended by design.** `AskUserQuestion` is disabled and permission prompts are denied except in bypass mode, so the query never waits for a user interface.
+
+### Source map
+
+| File | Role |
+|---|---|
+| [`src/index.ts`](src/index.ts) | Plugin entry: config schema, provider registration |
+| [`src/run.ts`](src/run.ts) | The SDK query lifecycle, result acceptance, and permission handling |
+| [`src/process.ts`](src/process.ts) | Managed-range termination escalation on disposal |
+| [`cordis.patch.yml`](cordis.patch.yml) | The Profile layer that registers the provider and contributes preset delegation tools |
+
+### Run flow
+
+A start accepts only a non-empty sequence of text blocks and derives the child cwd from the parent session. It creates a private `AbortController`, calls the official SDK `query()` with the exact concatenated task, and publishes the run only after the SDK's custom-spawn hook has supplied a live CLI handle owned by the subprocess seam. The provider iterates the complete message stream and accepts only a `result` message with `subtype: "success"`, `is_error: false`, and a nonblank `result`, followed by normal iterator completion. Every other outcome maps to a fixed-category `error` diagnostic naming the lifecycle stage and observed process outcome — the category set lives in [`src/run.ts`](src/run.ts). Local cancellation wins the result race and maps to `aborted` without a failure diagnostic.
+
+</details>
+
+-----
+
+<a id="further-exploration"></a>
+## Further Exploration
+
+Read these pages when the package-level contract is not enough. They move from this provider to the seam it plugs into and the sibling product provider.
+
+- [Subagent subsystem](../../../docs/subsystems/subagent.md) — the service contract, provider contract, and terminal result semantics.
+- [dsh-subagent seam](../subagent/README.md) — the registry and start API this provider registers on.
+- [Codex subagent provider](../subagent-codex/README.md) — the sibling product backend over the official app-server protocol.
+- [historical Claude Code and Codex backends](../../../.agents/notes/archived/feature/2026-08-04-claude-code-and-codex-subagent-backends.md) — the design record for the product providers.
+- [Generated configuration catalog](../../../docs/config-catalog.md#deepseek-aidsh-subagent-claude-code) — every accepted config field and its source declaration.
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 ### Child request
 
 #### What the model sees
 
-The Claude Code child receives the standalone text task as one fresh SDK query. Its workspace is the parent Session cwd, while its model, system instructions, tools, permissions, and authentication come from the host's native Claude settings and product installation.
+The Claude Code child receives the standalone text task as one fresh SDK query. Its workspace is the selected child working directory; the selected provider instance fixes the query's configured model, environment, and non-interactive permission mode, while an omitted model and every other product setting come from native Claude configuration. The executable version comes from the Bundle's pinned SDK platform payload.
 
 #### Token effect
 
@@ -83,23 +149,42 @@ Independent of the parent request cache. Reuse depends only on Claude Code's own
 
 #### What the model sees
 
-Through `dsh-tool-subagent`, a foreground call gives the parent the strict final Claude Code answer or the consumer's exact error for a non-completed result. A background call first returns a Job id; the generic job controls later deliver a completion notice, expose the final answer and status through `job_output`, and let `job_kill` request cancellation. Claude Code reasoning, tool activity, intermediate messages, stderr, workspace diffs, usage, and product ids are not copied into the parent Session.
+Through `dsh-tool-subagent`, the parent model first receives a child id, then the final Claude Code answer or a failure notice with its stop reason and safe diagnostic. Diagnostics contain only fixed stage, category, and observed protocol or process facts. Product reasoning, intermediate messages, tool activity, stderr, usage, product identifiers, commands, paths, and raw protocol payloads are not copied into the parent Session.
 
 #### Token effect
 
-Foreground input grows by the retained final answer or error. Background input also includes the start acknowledgement, completion notice, and any `job_output`, `job_kill`, or later status results; child tokens still do not enter the parent context. This provider adds no parent tool schema by itself.
+Parent input grows by the start acknowledgement and completion notice, including the final answer or failure detail. Child tokens do not enter the parent context. This provider adds no parent tool schema by itself.
 
 #### KV Cache effect
 
-Append-only: foreground adds one result after the reusable parent prefix, while background appends the Job acknowledgement, notice, and later control or collection results. Background scheduling can add a notice-driven turn, but none of these messages rewrites the earlier prefix.
+Start acknowledgements and completion notices append after the reusable parent request prefix. A notice may wake another turn without rewriting the existing prefix.
 
 ## Known Limitations and Deferred Work
 
+<a id="known-limitations-and-deferred-work"></a>
+
+
+These limits define when this provider is a poor fit or needs special operational care. They are current package constraints, not a general Claude Code comparison or a task backlog.
+
 - **One fresh query and process per run** — there is no continuation, resume, pooling, progress stream, or product-session persistence.
-- **Host settings are intentionally authoritative** — project and user settings can change model, tools, and behavior; the provider does not provide a filtered or hermetic production mode.
-- **Product installation and account state remain native** — a missing or incompatible `claude`, configuration error, or authentication failure is surfaced as a startup or run error; the plugin provides no installer or login flow.
-- **The SDK platform CLI remains in the install closure** — production ignores it in favor of the host `claude`, but the current SDK optional dependency is still installed and supplies the keyless compatibility fixture. Removing that payload belongs to the separate product installation-closure follow-up.
-- **No human interaction path** — `AskUserQuestion` is disabled and other interactive callbacks are absent, so tasks requiring new approval or input fail instead of suspending.
-- **Product payload is final text only** — reasoning, intermediate messages, tool traffic, usage, stderr, and workspace diffs remain product-local; generic Job ids, notices, and status come from the shared job runtime.
-- **No optional shared capabilities** — output schemas, child personas, tool filtering, and harness depth enforcement are rejected by the shared service for this provider.
+- **Static instance selection** — Profile rows fix provider names, optional models, and tool bindings; calls cannot choose or change either a provider or model dynamically, and every exposed tool needs a unique `toolName`.
+- **Host settings are intentionally authoritative** — when `model` is omitted, project and user settings choose it; native settings always retain the remaining tools and behavior, and the provider does not provide a filtered or hermetic production mode.
+- **Authentication and account state remain native** — the Bundle supplies the CLI but does not create an account, log in, or rewrite Claude settings; configuration and authentication failures surface with their lifecycle stage and the safe `unknown` fallback rather than a separate public classification.
+- **The SDK platform payload is required at delegation time** — installs that omit optional dependencies, unsupported platforms, and missing or damaged payloads fail at the first query; there is no host-CLI fallback.
+- **No human interaction path** — `AskUserQuestion` is disabled, permission prompts are denied, MCP elicitation is declined, and blocking dialogs fail closed instead of suspending.
+- **Assistant payload is final text only** — failed runs can also expose a separate safe diagnostic; reasoning, intermediate messages, tool traffic, usage, stderr, and workspace diffs remain outside the parent Session. Task identity and terminal results are retained in the parent log.
+- **No optional shared capabilities** — `agentPreset`, `agentOptions`, output schemas, and harness depth enforcement are rejected by the shared service for this provider.
 - **No wall-clock timeout or side-effect rollback** — the caller cancels long work, and files or external systems changed before cancellation are not restored.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+This Dev Note is working context for maintainers: open questions and undecided directions. It is explicitly non-authoritative — shipped behavior and limits live in the sections above and in the package code.
+
+- **Payload size disclosure** — the current darwin-arm64 platform payload packs to about 92 MB and unpacks to about 325 MB; these are disclosure numbers, not installation thresholds.
+- **Version-pinned protocol** — the runtime dependency is pinned to Agent SDK 0.3.263; upgrading pins a new SDK version and requires re-running the keyless real-product and loader-composition evidence.
+
+</details>

@@ -1,35 +1,88 @@
+---
+description: "浏览器操作 提供方 注册服务，供一次启用一个浏览器后端的部署使用。"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-browser-use
 
 [English](README.md) | 中文
 
-browser-use 能力定义（`ctx.browserUse`）。一个组合**最多挂载一个**让模型检查并操作网页的 provider；这条 seam 拥有那个唯一名额，而每个 provider 自己拥有它的操作、工具与平台要求。
+## 概述
 
-## 服务契约
+部署可以一次启用一个浏览器操作 提供方。加载另一个 提供方 时会报错并指出已注册的 提供方 名称。各 提供方 提供自己的工具并拥有浏览器会话。本包不添加模型可见工具或浏览器操作。
 
-- `register(name)` 占用那唯一名额直到它的 disposer 运行，并返回该 disposer。第二次注册会抛错——**包括重复当前名字的注册**，因此一个未释放就重启的 provider 无法悄悄接管。
-- `providerName` 公布已注册的名字，并在 provider 资源关闭期间继续保持公布；注册释放后清空。
-- provider 必须在释放注册**之前**停掉自己的工具并等待其拥有的浏览器工作结束，因此释放后的名额永远不会与仍在关闭的浏览器进程重叠。
+## 目录
 
-这条 seam 不定义任何工具、传输与页面内容策略：`@deepseek-ai/dsh-browser-use-playwright-mcp` 为 Playwright 浏览器工具占用该名额，另一个 provider 也可以为别的浏览器后端这样做。
+- [使用本包](#use-this-package)
+- [理解实现](#understand-the-implementation)
+- [延伸阅读](#further-exploration)
+- [模型体验](#model-experience)
+- [已知限制与延期工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
 
-## 配置
+-----
 
-无。该服务以裸行挂载，配置由各 provider 自带。
+<a id="use-this-package"></a>
+## 使用本包
 
-## 开发注记
+在 Cordis 组合中，将服务与所选 提供方 一起挂载一次：
 
-吸收自官方 harness 的 browser-use 组（`packages/browser-use/browser-use`）：独占式注册的设计与诊断信息是他们的，本包把它们重述在本 fork 的 rc.7 seam 之上。官方实验组的**按 Session 挂载浏览器**需要更新的 scope API，不在本次移植范围内。
+```yaml
+- name: '@deepseek-ai/dsh-browser-use'
+```
 
+服务没有配置。提供方 插件注入 `browserUse` 并调用 `ctx.browserUse.register(BrowserUseProviderName(name))`；品牌类型从 `@deepseek-ai/dsh-browser-use/brand` 导出。返回的 effect 清理器释放该注册。
+
+提供方 在释放注册前停止接收工具调用、关闭资源并等待自己拥有的工作结束。`ctx.browserUse.providerName` 在释放之前持续报告已注册名称。
+
+-----
+
+<a id="understand-the-implementation"></a>
+## 理解实现
+
+<details>
+<summary>实现内部机制 — 点击展开</summary>
+
+一个私有名称拥有该注册位。Cordis effect 在插件卸载时移除贡献；重复调用清理器不能移除后续注册。[源码](src/index.ts) 不包含浏览器对象、操作接口、资源生命周期或 提供方 选择器。
+
+</details>
+
+-----
+
+<a id="further-exploration"></a>
+## 延伸阅读
+
+- [浏览器操作](../../../docs/subsystems/browser-use.zh.md) — 提供方 选择与 Session 所有权。
+- [Playwright MCP 提供方](../../experimental/browser-use-playwright-mcp/README.zh.md) — Playwright 浏览器工具。
+- [Chrome DevTools MCP 提供方](../../experimental/browser-use-chrome-devtools-mcp/README.zh.md) — Chromium 检查与控制。
+- [Stagehand 提供方](../../experimental/browser-use-stagehand-native/README.zh.md) — 支持 AI（人工智能）辅助的原生浏览器操作。
+
+-----
+
+<a id="model-experience"></a>
 ## 模型体验
 
-无：本包不贡献任何提示、工具、消息或 provider 请求。
+无，因为此注册表只记录 提供方 名称。
 
 #### KV Cache 影响
 
-无；本包从不组装模型输入。
+注册不改变模型请求。提供方 拥有的工具与指导决定各自对请求前缀的影响。
 
-## 已知限制与推迟项
+## 已知限制与延期工作
 
-- **一个组合一个浏览器后端**——独占名额就是契约，所以同一进程里两个后端需要第二个组合，而不是两个 provider。
-- **自身没有页面内容策略**——provider 可以读取、导航或提交什么，属于该 provider 与部署的审批策略；本定义刻意不携带任何策略。
-- **没有按 Session 的浏览器**——已挂载后端的工具同时服务所有 Session。要做到每个 Session 一个浏览器，需要一个把服务端命名空间限定到 Session 的 MCP 客户端：本基线的客户端对每个 `serverName` 只在进程根上保留一次，因此同命名空间的第二个实例会在加载时失败。
+<a id="known-limitations-and-deferred-work"></a>
+
+服务在其 Cordis 服务实例内限制注册。
+
+- **浏览器所有权** — 提供方 拥有浏览器资源并实施 Session 隔离；此服务不保存浏览器状态。
+- **提供方 选择** — 配置选择 提供方；模型不能在运行时切换已注册后端。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者工作上下文 — 点击展开</summary>
+
+无。
+
+</details>

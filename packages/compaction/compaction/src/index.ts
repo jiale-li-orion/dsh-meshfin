@@ -2,40 +2,31 @@
  * Compaction Service Definition (`ctx.compaction`): providers decide when to
  * compact and replace a history range with one summary node by subclassing
  * {@link CompactionEngine}. This interface necessarily depends on session and LLM
- * vocabulary; the rationale is in the
- * [compaction Agent Note](../../../../.agents/notes/implemented/feature/2026-06-18-compaction-capability-seam.md).
+ * vocabulary; the dependency rule is documented in the
+ * [compaction reference](../README.md#understand-the-implementation).
  * @module @deepseek-ai/dsh-compaction
  */
 
 import { Context, Service } from '@deepseek-ai/cordis'
-import type { Session } from '@deepseek-ai/dsh-session'
+import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
-import type {
-  CompactionPreparation,
-  CompactionPreparationProgress,
-  CompactionPreparationRequest,
-  CompactionResult,
-} from './types.ts'
+import type { CompactionResult } from './types.ts'
+import type { CompactionCheckpointSource } from './checkpoint.ts'
 
-export type {
-  CompactionPreparation,
-  CompactionPreparationAttempt,
-  CompactionPreparationCall,
-  CompactionPreparationChunk,
-  CompactionPreparationPlan,
-  CompactionPreparationProgress,
-  CompactionPreparationRequest,
-  CompactionPreparationStage,
-  CompactionResult,
-} from './types.ts'
-export { CompactionId, CompactionPreparationId } from './brand.ts'
-export { toolPairingBalancedAfter, toolPairingBalancedBefore, toolPairingCutBalances } from './tool-pairing.ts'
-export { compactionPreparationDigest } from './preparation.ts'
+export type { CompactionResult } from './types.ts'
+export { CompactionId } from './brand.ts'
+export { toolPairingBalancedAfter, toolPairingBalancedBefore } from './tool-pairing.ts'
 // The checkpoint source constructor and predicate are declared on the cordis-free
 // `./checkpoint` leaf so client and wire programs can name them without this
 // root's Context merge; the root stays the host-side entry point for both.
 export { compactCheckpointSource, isCompactCheckpointSource } from './checkpoint.ts'
 export type { CompactionCheckpointSource } from './checkpoint.ts'
+
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'compact-checkpoint': CompactionCheckpointSource
+  }
+}
 
 /** Why automatic policy is asking a backend to consider compaction. */
 export type CompactionTrigger = 'pressure' | 'context-overflow'
@@ -98,6 +89,22 @@ declare module '@deepseek-ai/cordis' {
   interface Context {
     compaction: CompactionEngine
   }
+  interface Events {
+    /**
+     * Recover a failed summary request by synchronously recording a durable
+     * change to its selected input. Return true only after making progress;
+     * the provider re-derives and re-prices the selection before retrying.
+     * Call next() when the failure cannot be recovered. Decisions survive a
+     * later summary failure or cancellation.
+     * @param payload.session - session containing the selected input.
+     * @param payload.sourceEventSeqs - selected message events in request order.
+     * @param payload.error - failure thrown by the summarizer.
+     * @param payload.signal - optional compaction cancellation signal.
+     * @param next - delegate to the next recovery listener.
+     * @mode waterfall
+     */
+    'compaction/summary-error'(payload: { session: Session; sourceEventSeqs: readonly SessionSeq[]; error: unknown; signal?: AbortSignal }, next: () => boolean): boolean
+  }
 }
 
 /**
@@ -112,10 +119,6 @@ declare module '@deepseek-ai/cordis' {
 export abstract class CompactionEngine extends Service {
   constructor(ctx: Context) {
     super(ctx, 'compaction')
-    ctx.inject(['compactions'], directoryCtx => directoryCtx.compactions.register(
-      this,
-      (ctx as Context & { agent?: CompactionAgentContext }).agent,
-    ))
   }
 
   /**
@@ -182,48 +185,10 @@ export abstract class CompactionEngine extends Service {
    * @returns the appended event seqs, summary, replaced range, and token accounting.
    */
   abstract compactRegion(
-    start: number,
-    end: number,
+    start: SessionSeq,
+    end: SessionSeq,
     agent: CompactionAgentContext,
     signal?: AbortSignal,
-  ): Promise<CompactionResult>
-
-  /**
-   * Summarize one stable selected range without changing the Session surface.
-   * The caller records the request before invoking this method and durably
-   * records every progress item before review begins.
-   * @param request - exact selected span, pricing, digest, and optional preservation brief.
-   * @param agent - Agent whose scoped provider and Session own the preparation.
-   * @param signal - cancellation forwarded to every provider call.
-   * @param onProgress - called for the capacity plan, each call attempt, and each successful completion.
-   * @returns deterministic chunks, every call result, and the final generated summary.
-   */
-  abstract prepareRegion(
-    request: CompactionPreparationRequest,
-    agent: CompactionAgentContext,
-    signal: AbortSignal,
-    onProgress: (progress: CompactionPreparationProgress) => Promise<void>,
-  ): Promise<CompactionPreparation>
-
-  /**
-   * Commit one reviewed preparation through short idle maintenance.
-   * Implementations revalidate exact selected membership, digest, balance,
-   * token price, and summary shrink before appending the standard bracket.
-   * @param preparation - generated preparation and provider-call facts.
-   * @param summary - reviewed final summary blocks.
-   * @param source - whether generated output or a human/model edit is committed.
-   * @param admission - idle human maintenance or the caller's already-open model turn.
-   * @param agent - idle Agent whose Session is mutated.
-   * @param signal - cancellation for admission and persistence work.
-   * @returns the committed standard compaction result.
-   */
-  abstract commitPrepared(
-    preparation: CompactionPreparation,
-    summary: readonly import('@deepseek-ai/dsh-llm').ContentBlock[],
-    source: 'generated' | 'human' | 'model',
-    admission: 'idle' | 'current-turn',
-    agent: ManualCompactAgentContext,
-    signal: AbortSignal,
   ): Promise<CompactionResult>
 }
 

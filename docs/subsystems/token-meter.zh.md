@@ -6,43 +6,27 @@
 
 来源：[`packages/llm/token-meter/src/types.ts`](../../packages/llm/token-meter/src/types.ts)
 
-## 计量类型
+## `TokenMeasurement`
 
 ```ts type-equiv
-/** Request-pressure totals shared by complete and positional-range measurements. */
-interface TokenMeasurementTotals {
+/** Detached immutable request-pressure and surface snapshot at one consumed log revision. */
+interface TokenMeasurement {
   /** Number of durable events consumed; equal to the next unread event seq. */
-  readonly logRevision: number
+  readonly logRevision: SessionLogOffset
   /** Provider or heuristic anchor used for this measurement. */
   readonly baseline: TokenMeasurementBaseline
   /** Signed repricing of current surface content relative to the baseline anchor. */
   readonly surfaceDeltaTokens: number
   /** Non-negative current request-and-response pressure. */
   readonly totalTokens: number
-  /** Total heuristic tokens across the current surface. */
+  /** Total route-priced request tokens across the current surface; equals the sum of the node prices. */
   readonly surfaceTokens: number
-}
-```
-
-```ts type-equiv
-/** Detached immutable request-pressure and complete surface snapshot. */
-interface TokenMeasurement extends TokenMeasurementTotals {
-  /** Every current surface node in positional head-to-tail order. */
+  /** Current surface nodes in positional head-to-tail order. */
   readonly nodes: readonly TokenSurfaceNode[]
 }
 ```
 
-```ts type-equiv
-/** Detached totals plus one half-open positional slice of current surface nodes. */
-interface TokenRangeMeasurement extends TokenMeasurementTotals {
-  /** Current-surface position represented by `nodes[0]`. */
-  readonly rangeStart: number
-  /** Selected current surface nodes in positional order. */
-  readonly nodes: readonly TokenSurfaceNode[]
-}
-```
-
-`measure()` 返回全部位置节点；`measureRange(from, to)` 只返回选中的半开区间，同时保留相同总量与已消费 revision。`baseline.kind === 'usage'` 表示最近一次成功的提供方调用具有相同的规范请求 envelope，且该调用的总量不低于其完整启发式锚点。`estimated` 表示不存在可复用的保守 usage 锚点，因此服务使用固定启发式规则对完整 envelope 和表层定价。后续成功请求会替换早先的锚点；有符号的 `surfaceDeltaTokens` 会保留相对于匹配锚点的增长与缩减。`totalTokens` 仍表示请求与响应压力，`surfaceTokens` 则是仅针对表层的启发式总量，等于全部当前节点价格之和。
+每次计量都会通过 `ctx.llm` 把生效信封的路由 provider/model 解析为该路由声明的请求图片定价，因此图片出现处按请求实际发送的视觉 token 加模型可见文本计价；未声明定价的路由与组合保持固定启发式规则。`baseline.kind === 'usage'` 表示最近一次成功的提供方调用具有相同的规范请求 envelope，且该调用的总量不低于其完整路由定价锚点。`estimated` 表示不存在可复用的保守 usage 锚点，因此服务自行对完整信封和表层定价。后续成功请求会替换早先的锚点；有符号的 `surfaceDeltaTokens` 会保留相对于匹配锚点的增长与缩减，且两侧按同一路由重新定价。`totalTokens` 仍表示请求与响应压力，`surfaceTokens` 则是表层的路由定价总量，等于所有节点价格之和。
 
 ## `TokenSurfaceNode`
 
@@ -50,9 +34,20 @@ interface TokenRangeMeasurement extends TokenMeasurementTotals {
 /** One token-priced node in the current ordered session surface. */
 interface TokenSurfaceNode {
   /** Durable sequence number of the surface event. */
-  readonly seq: number
-  /** Heuristic tokens for the exact message projected by this node. */
+  readonly seq: SessionSeq
+  /**
+   * Request-pressure tokens for the exact message projected by this node under
+   * the measured route: image occurrences carry the route's declared visual
+   * price when the routed adapter declares one, and the fixed heuristic
+   * otherwise. Trigger, retention, and range selection all read this price.
+   */
   readonly tokens: number
+  /**
+   * Fixed-heuristic tokens for the same message, independent of any route.
+   * The shadow-price protocol prices replacements with this value so the O(1)
+   * projection fold stays in agreement with its own appends.
+   */
+  readonly heuristicTokens: number
 }
 ```
 
@@ -64,7 +59,7 @@ interface TokenSurfaceNode {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxtokenmeter--tokenmeter"></a>
 
@@ -76,30 +71,25 @@ Replay owner for one service-wide estimator and isolated per-session folds.
 /**
  * Measure current request pressure and surface through the durable tail.
  *
- * Provider usage is reused only when the latest successful call's canonical
- * request envelope matches `requestHeader` and its total is no lower than
- * that call's full heuristic anchor; otherwise the complete envelope and
- * surface are heuristically repriced.
+ * The effective envelope's routed provider/model selects the request-image
+ * pricing every node is priced under: a route whose adapter declares image
+ * pricing charges each retained image its visual tokens plus its
+ * model-visible text, while other routes keep the fixed heuristic. Provider
+ * usage is reused only when the latest successful call's canonical request
+ * envelope matches `requestHeader` and its total is no lower than that
+ * call's full route-priced anchor; otherwise the complete envelope and
+ * surface are repriced. The anchor includes all surface nodes immediately
+ * before the assistant message, including inputs admitted after step/start.
  *
- * `requestHeader` affects request pressure only; surface fields always
- * describe the current session surface. Every call clones those positional
- * nodes, so measurement is O(surface).
+ * `requestHeader` replaces the latest logged envelope for pressure and node
+ * pricing; the node set always describes the current session surface. Every
+ * call clones those positional nodes, so measurement is O(surface).
  *
  * @param session - session to replay through its current durable tail.
  * @param requestHeader - optional effective request envelope replacing the latest logged header.
  * @returns a detached deeply immutable pressure and surface measurement.
  */
 measure(session: Session, requestHeader?: EpochHeader): TokenMeasurement
-
-/**
- * Measure full request pressure while copying only one positional surface range.
- * @param session - session to replay through its current durable tail.
- * @param from - inclusive current-surface position.
- * @param to - exclusive current-surface position.
- * @param requestHeader - optional effective request envelope replacing the latest logged header.
- * @returns detached totals plus the selected priced nodes.
- */
-measureRange( session: Session, from: number, to: number, requestHeader?: EpochHeader, ): TokenRangeMeasurement
 
 /**
  * Heuristically price one model-visible message (instance face of the pure
@@ -110,7 +100,7 @@ measureRange( session: Session, from: number, to: number, requestHeader?: EpochH
 estimateMessage(message: Message): number
 ```
 
-Types: [EpochHeader](session.md) · [Message](llm-streaming.md) · [Session](session.md)
+Types: [EpochHeader](session.zh.md) · [Message](llm-streaming.zh.md) · [Session](session.zh.md)
 
-Source: [`packages/llm/token-meter/src/index.ts:75`](../../packages/llm/token-meter/src/index.ts)
+Source: [`packages/llm/token-meter/src/index.ts`](../../packages/llm/token-meter/src/index.ts)
 <!-- END GENERATED cordis-surface -->

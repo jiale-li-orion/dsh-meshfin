@@ -1,6 +1,6 @@
 // Web e2e scenario for the shipped default search composition. A real browser
 // drives `web_search`; the model stream is replayed while the real DeepSeek
-// provider calls a deterministic local Anthropic-compatible endpoint through
+// provider calls a deterministic local Search API endpoint through
 // the real credentials service.
 import { readFile } from 'node:fs/promises'
 import { createServer, type Server } from 'node:http'
@@ -16,41 +16,41 @@ import {
   assertFixtureInventory, captureStableAria, compareOrRefreshGolden, fixtureUserPrompts,
   launchWebScaffold, recordFixture, watchConsole, webSnapshotMode, type WebScaffold,
 } from './scaffold.ts'
-import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './support.ts'
+import { connectFreshWorkspace, expandOwningTurnProcess, newEnglishPage, saveFailureShot } from './support.ts'
 
-const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/web-search-round', import.meta.url))
-const FIXTURE = fileURLToPath(new URL('./snapshots/web-search-round/session.jsonl', import.meta.url))
-const UI_EXPECTED = fileURLToPath(new URL('./snapshots/web-search-round/ui.expected.md', import.meta.url))
+const SNAPSHOT_DIR = fileURLToPath(new URL('../../../snapshots/web/web-search-round', import.meta.url))
+const FIXTURE = fileURLToPath(new URL('../../../snapshots/web/web-search-round/session.v3.jsonl', import.meta.url))
+const UI_EXPECTED = fileURLToPath(new URL('../../../snapshots/web/web-search-round/ui.expected.md', import.meta.url))
 const MODE = webSnapshotMode()
-const QUERY = 'DeepSeek Harness snapshot search'
-const PROMPT = `Use web_search to search exactly "${QUERY}". Then reply exactly SEARCH_DONE and stop.`
+const QUERIES = ['DeepSeek Harness snapshot search', 'DeepSeek Harness multi-query search'] as const
+const PROMPT = `Use web_search once with queries ${JSON.stringify(QUERIES)}. Then reply exactly SEARCH_DONE and stop.`
 const SEARCH_CREDENTIAL_REF = credentialRef('DSH_WEB_SEARCH_E2E_KEY')
 const SEARCH_CREDENTIAL = 'snapshot-search-key'
 
 /**
- * Provider results the double returns, exceeding the shipped `searchMaxResults`
- * so the seam's cap and the card's scroll container are both exercised. Each row
- * carries a title, a snippet, and a date, so 8 kept rows exceed the `.sources`
- * 320px max-height.
+ * Provider results the double returns per query. The combined result exceeds
+ * the shipped `searchMaxResults`, so the tool's round-robin cap and the card's
+ * scroll container are both exercised. Each row carries a title, a snippet,
+ * and a date, so 8 kept rows exceed the `.sources` 320px max-height.
  */
-const PROVIDER_RESULT_COUNT = 12
+const PROVIDER_RESULT_COUNT = 6
 
 /** One provider result's URL, by 1-based provider order. */
-function resultUrl(ordinal: number): string {
-  return `https://docs.example.test/search/${ordinal}`
+function resultUrl(queryIndex: number, ordinal: number): string {
+  return `https://docs.example.test/search/${queryIndex + 1}/${ordinal}`
 }
 
 /** One provider result's title, by 1-based provider order. */
-function resultTitle(ordinal: number): string {
-  return `Snapshot Search Result ${ordinal}`
+function resultTitle(queryIndex: number, ordinal: number): string {
+  return `Snapshot Search ${queryIndex + 1} Result ${ordinal}`
 }
 
 /** One provider result's citation excerpt, by 1-based provider order. */
-function resultSnippet(ordinal: number): string {
-  return `Snapshot search excerpt ${ordinal}: the harness replays this source list from a local endpoint.`
+function resultSnippet(queryIndex: number, ordinal: number): string {
+  return `Snapshot search ${queryIndex + 1} excerpt ${ordinal}: the harness replays this source list from a local endpoint.`
 }
 
-/** One provider result's `page_age`, by 1-based provider order (July 2026 days 01..12). */
+/** One provider result's publication date, by 1-based provider order (July 2026 days 01..12). */
 function resultPageAge(ordinal: number): string {
   return `2026-07-${String(ordinal).padStart(2, '0')}`
 }
@@ -58,46 +58,58 @@ function resultPageAge(ordinal: number): string {
 /** The 1-based provider ordinals, in provider order. */
 const RESULT_ORDINALS = Array.from({ length: PROVIDER_RESULT_COUNT }, (_value, index) => index + 1)
 
+/** Sources kept after round-robin merging reaches the shipped combined cap. */
+const KEPT_SOURCES = RESULT_ORDINALS.flatMap(ordinal => QUERIES.map((_query, queryIndex) => ({
+  url: resultUrl(queryIndex, ordinal),
+  title: resultTitle(queryIndex, ordinal),
+  snippet: resultSnippet(queryIndex, ordinal),
+  publishedAt: resultPageAge(ordinal),
+}))).slice(0, WEB_SEARCH_MAX_RESULTS)
+
+/** URLs omitted after the combined source cap is reached. */
+const DROPPED_SOURCE_URLS = RESULT_ORDINALS.flatMap(ordinal => QUERIES.map(
+  (_query, queryIndex) => resultUrl(queryIndex, ordinal),
+)).slice(WEB_SEARCH_MAX_RESULTS)
+
 interface CapturedSearchRequest {
   path: string
   apiKey: string | undefined
   body: unknown
 }
 
-/** Start the deterministic DeepSeek Messages double used by the real provider. */
+/** The Search API `query` field of one captured request body; `ori_question` also names every query. */
+function requestQuery(body: unknown): unknown {
+  return typeof body === 'object' && body !== null && 'query' in body ? body.query : undefined
+}
+
+/** Start the deterministic DeepSeek Search double used by the real provider. */
 async function startSearchServer(captured: CapturedSearchRequest[]): Promise<{ server: Server; baseURL: string }> {
   const server = createServer((request, response) => {
     let body = ''
     request.setEncoding('utf8')
     request.on('data', (chunk: string) => { body += chunk })
     request.on('end', () => {
+      const parsedBody: unknown = JSON.parse(body)
       captured.push({
         path: request.url ?? '',
-        apiKey: typeof request.headers['x-api-key'] === 'string' ? request.headers['x-api-key'] : undefined,
-        body: JSON.parse(body) as unknown,
+        apiKey: typeof request.headers.authorization === 'string' ? request.headers.authorization : undefined,
+        body: parsedBody,
       })
+      const queryIndex = QUERIES.findIndex(query => requestQuery(parsedBody) === query)
+      if (queryIndex < 0) {
+        response.writeHead(400, { 'content-type': 'application/json' })
+        response.end(JSON.stringify({ error: 'unknown fixture query' }))
+        return
+      }
       response.writeHead(200, { 'content-type': 'application/json' })
       response.end(JSON.stringify({
-        content: [
-          {
-            type: 'text',
-            text: `Found ${PROVIDER_RESULT_COUNT} sources.`,
-            citations: RESULT_ORDINALS.map(ordinal => ({
-              type: 'web_search_result_location',
-              url: resultUrl(ordinal),
-              cited_text: resultSnippet(ordinal),
-            })),
-          },
-          {
-            type: 'web_search_tool_result',
-            content: RESULT_ORDINALS.map(ordinal => ({
-              type: 'web_search_result',
-              url: resultUrl(ordinal),
-              title: resultTitle(ordinal),
-              page_age: resultPageAge(ordinal),
-            })),
-          },
-        ],
+        results: RESULT_ORDINALS.map(ordinal => ({
+          url: resultUrl(queryIndex, ordinal),
+          title: resultTitle(queryIndex, ordinal),
+          snippet: resultSnippet(queryIndex, ordinal),
+          content: '', site_name: null, site_icon: null,
+          date: resultPageAge(ordinal),
+        })),
       }))
     })
   })
@@ -112,12 +124,11 @@ async function startSearchServer(captured: CapturedSearchRequest[]): Promise<{ s
   return { server, baseURL: `http://127.0.0.1:${address.port}` }
 }
 
-describe('web e2e: shipped default web search', () => {
+describe('web e2e: opt-in Search API web search', () => {
   let scaffold: WebScaffold
   let browser: Browser
   let page: Page
   let searchServer: Server | undefined
-  let searchBaseURL: string
   let tripwire: ReturnType<typeof watchConsole>
   const searchRequests: CapturedSearchRequest[] = []
   const sessionEvents: SessionEvent[] = []
@@ -125,11 +136,13 @@ describe('web e2e: shipped default web search', () => {
   beforeAll(async () => {
     const search = await startSearchServer(searchRequests)
     searchServer = search.server
-    searchBaseURL = search.baseURL
     scaffold = await launchWebScaffold({
-      deepSeekSearch: {
-        baseURL: search.baseURL,
+      extraOverlayPath: fileURLToPath(new URL('./pin-browse-picker.overlay.yml', import.meta.url)),
+      compareReplaySession: true,
+      deepSeekWebApi: {
+        baseURL: `${search.baseURL}/api/v1/tools`,
         apiKeyEnv: SEARCH_CREDENTIAL_REF,
+        select: true,
       },
       ...(MODE === 'record' ? {} : { replayFixture: FIXTURE, paceMs: 15 }),
     })
@@ -138,7 +151,7 @@ describe('web e2e: shipped default web search', () => {
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
-    await page.goto(scaffold.baseUrl, { waitUntil: 'load' })
+    await page.goto(scaffold.authenticatedUrl, { waitUntil: 'load' })
     await page.waitForSelector('[class*="frame"]', { timeout: 30_000 })
     await connectFreshWorkspace(page, scaffold.workspaceCwd)
   }, 120_000)
@@ -163,7 +176,7 @@ describe('web e2e: shipped default web search', () => {
     if (MODE !== 'record') {
       expect(fixtureUserPrompts(await readFile(FIXTURE, 'utf8'))).toEqual([PROMPT])
     }
-    const input = page.locator('textarea').first()
+    const input = page.locator('[data-composer-input]').first()
     await input.waitFor({ timeout: 10_000 })
     const settled = scaffold.whenTurnSettled()
     await input.fill(PROMPT)
@@ -173,28 +186,16 @@ describe('web e2e: shipped default web search', () => {
   }, 200_000)
 
   it.skipIf(MODE === 'record')('uses the real provider and persists the capped structured result', () => {
-    expect(searchRequests).toHaveLength(1)
-    expect(searchRequests[0]).toMatchObject({
-      path: '/messages',
-      apiKey: SEARCH_CREDENTIAL,
-      body: {
-        messages: [{
-          role: 'user',
-          content: [{ type: 'text', text: `Perform a web search for the query: ${QUERY}` }],
-        }],
-        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
-      },
-    })
-
-    const auxiliaryRequest = sessionEvents.find(
-      (event): event is Extract<SessionEvent, { type: 'web/deepseek-search-llm-request' }> =>
-        event.type === 'web/deepseek-search-llm-request',
-    )
-    expect(auxiliaryRequest?.data).toEqual({
-      endpoint: `${searchBaseURL}/messages`,
-      apiVersion: '2023-06-01',
-      body: searchRequests[0]?.body,
-    })
+    expect(searchRequests).toHaveLength(QUERIES.length)
+    for (const query of QUERIES) {
+      const request = searchRequests.find(candidate => requestQuery(candidate.body) === query)
+      if (request === undefined) throw new Error(`missing provider request for query: ${query}`)
+      expect(request).toMatchObject({ path: '/api/v1/tools/search', apiKey: `Bearer ${SEARCH_CREDENTIAL}` })
+      expect(request.body).toEqual({
+        query, count: WEB_SEARCH_MAX_RESULTS, need_content: false, ori_question: Array.from(PROMPT).slice(0, 128).join(''),
+      })
+    }
+    expect(sessionEvents.filter(event => event.type === 'web/deepseek-search-llm-request')).toEqual([])
 
     const searchCall = sessionEvents.find(
       (event): event is Extract<SessionEvent, { type: 'tool/call' }> =>
@@ -206,28 +207,22 @@ describe('web e2e: shipped default web search', () => {
         event.type === 'tool/result' && event.data.message.source.callId === searchCall.data.callId,
     )
     if (searchResult === undefined) throw new Error('web_search produced no durable result')
-    const content = searchResult.data.message.content[0]
-    expect(content.isError).toBe(false)
-    const rendered = content.content.filter(block => block.type === 'text').map(block => block.text).join('')
-    // The seam caps the provider's list at the shipped searchMaxResults before
-    // the tool renders it, so the kept prefix is model-visible and the dropped
-    // suffix is not.
-    for (const ordinal of RESULT_ORDINALS.slice(0, WEB_SEARCH_MAX_RESULTS)) {
-      expect(rendered).toContain(`[${resultTitle(ordinal)}](${resultUrl(ordinal)})`)
+    const message = searchResult.data.message
+    expect(message.isError).toBe(false)
+    const rendered = message.content.filter(block => block.type === 'text').map(block => block.text).join('')
+    // The tool interleaves sources from both seam results before applying the
+    // combined cap, so each query remains represented in model-visible output.
+    for (const source of KEPT_SOURCES) {
+      expect(rendered).toContain(`[${source.title}](${source.url})`)
     }
-    for (const ordinal of RESULT_ORDINALS.slice(WEB_SEARCH_MAX_RESULTS)) {
-      expect(rendered).not.toContain(resultUrl(ordinal))
+    for (const url of DROPPED_SOURCE_URLS) {
+      expect(rendered).not.toContain(url)
     }
     expect(rendered).toContain(
       `(Showing the first ${WEB_SEARCH_MAX_RESULTS} sources. Refine the query for more.)`,
     )
     expect(searchResult.data.meta).toMatchObject({
-      sources: RESULT_ORDINALS.slice(0, WEB_SEARCH_MAX_RESULTS).map(ordinal => ({
-        url: resultUrl(ordinal),
-        title: resultTitle(ordinal),
-        snippet: resultSnippet(ordinal),
-        publishedAt: resultPageAge(ordinal),
-      })),
+      sources: KEPT_SOURCES,
       truncated: true,
     })
   })
@@ -236,7 +231,9 @@ describe('web e2e: shipped default web search', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-search-aria'))
     await expect.poll(() => page.getByText('SEARCH_DONE', { exact: true }).count(), { timeout: 15_000 })
       .toBeGreaterThanOrEqual(1)
-    await page.locator('[data-tool="web_search"]').waitFor({ timeout: 10_000 })
+    const searchTool = page.locator('[data-tool="web_search"]')
+    await expandOwningTurnProcess(page, searchTool)
+    await searchTool.waitFor({ timeout: 10_000 })
     const snapshot = await captureStableAria(page, '[class*="centerCol"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(UI_EXPECTED, snapshot, MODE)
   })
@@ -244,18 +241,18 @@ describe('web e2e: shipped default web search', () => {
   it.skipIf(MODE === 'record')('scrolls the capped source list inside the fixed-height container', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-search-sources-scroll'))
     const row = page.locator('[data-tool="web_search"] [data-expandable]').first()
+    await expandOwningTurnProcess(page, row)
     await row.click()
     await expect.poll(() => row.getAttribute('aria-expanded'), { timeout: 5_000 }).toBe('true')
 
     const card = page.locator('[data-web="search"]')
     const sources = card.locator('ol')
     await sources.waitFor({ timeout: 10_000 })
-    // The card draws exactly the sources the model saw: the seam's cap, not the
-    // provider's list length.
+    // The card draws exactly the sources the model saw after the combined cap.
     expect(await sources.locator('li').count()).toBe(WEB_SEARCH_MAX_RESULTS)
     // The list is complete in the DOM, so the card carries no expand control.
     expect(await card.locator('button').count()).toBe(0)
-    expect(await card.getByText('来源列表已截断').isVisible()).toBe(true)
+    expect(await card.getByText('Source list truncated').isVisible()).toBe(true)
 
     const geometry = await sources.evaluate((element) => {
       const computed = getComputedStyle(element)
@@ -273,6 +270,7 @@ describe('web e2e: shipped default web search', () => {
 
   it.skipIf(MODE === 'record')('reserves marker room a scroll container cannot clip back', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-search-marker-room'))
+    await expandOwningTurnProcess(page, page.locator('[data-tool="web_search"]'))
     // `overflow-y: auto` clips inline-start overflow with no way to scroll it
     // back, and markers are right-aligned to the content edge, so a marker wider
     // than `padding-left` silently loses its leading digits. `searchMaxResults`
@@ -293,6 +291,6 @@ describe('web e2e: shipped default web search', () => {
   it.skipIf(MODE === 'record')('stayed clean and kept the exact fixture inventory', async () => {
     expect(tripwire.pageErrors).toEqual([])
     expect(tripwire.warnings).toEqual([])
-    await assertFixtureInventory(SNAPSHOT_DIR, ['session.jsonl', 'ui.expected.md'])
+    await assertFixtureInventory(SNAPSHOT_DIR, ['session.v3.jsonl', 'ui.expected.md'])
   })
 })

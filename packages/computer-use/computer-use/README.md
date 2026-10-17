@@ -1,35 +1,87 @@
+---
+description: "Computer-use provider registration for deployments that enable one desktop driver at a time."
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-computer-use
 
 English | [中文](README.zh.md)
 
-The computer-use capability definition (`ctx.computerUse`). A composition mounts **at most one** provider that lets a model observe and operate a desktop; the seam owns that single slot, and each provider owns its own operations, tools, and platform requirements.
+## Summary
 
-## Service contract
+A deployment can enable one computer-use provider at a time. Loading another provider fails with the registered provider name. Each provider supplies its own tools and desktop operations. This package adds no model-visible tools and does not coordinate concurrent Sessions.
 
-- `register(name)` reserves the sole slot until its disposer runs and returns that disposer. A second registration throws — including one repeating the current name, so a provider that restarted without releasing cannot silently take over.
-- `providerName` publishes the registered name, and keeps publishing it while the provider's resources are closing; a released registration clears it.
-- Providers must stop their tools and await owned work **before** releasing the registration, so a released slot never overlaps a closing desktop session.
+## Table of Contents
 
-The seam defines no tool and no transport: `@deepseek-ai/dsh-computer-use-cua-driver` reserves the slot for a Cua Driver desktop, and another provider may do the same for a different desktop.
+- [Use this package](#use-this-package)
+- [Understand the implementation](#understand-the-implementation)
+- [Further Exploration](#further-exploration)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
-## Configuration
+-----
 
-None. The service is mounted with a bare row and providers carry their own configuration.
+<a id="use-this-package"></a>
+## Use this package
 
+Mount the service once beside the chosen provider in a Cordis composition:
 
-## Dev Note
+```yaml
+- name: '@deepseek-ai/dsh-computer-use'
+```
 
-Absorbed from the official harness's computer-use group (`packages/computer-use/computer-use`): the exclusive-registration design and its diagnostics are theirs, with this package restating them against this fork's rc.7 seams. The provider's per-Session mounting in the official experimental group needs newer scope APIs and is not part of this port.
+The service has no configuration. Provider plugins inject `computerUse` and call `ctx.computerUse.register(ComputerUseProviderName(name))`; the brand is exported from `@deepseek-ai/dsh-computer-use/brand`. The returned effect disposer releases that registration.
 
+Providers stop admitting tool calls, close their resources, and await owned work before releasing the registration. `ctx.computerUse.providerName` reports the registered name until release.
+
+-----
+
+<a id="understand-the-implementation"></a>
+## Understand the implementation
+
+<details>
+<summary>Implementation internals — click to expand</summary>
+
+One private name owns the slot. Cordis effects remove contributions when their plugin unloads; a repeated disposer cannot remove a later registration. The [source](src/index.ts) contains no driver object, operation interface, or provider selector.
+
+</details>
+
+-----
+
+<a id="further-exploration"></a>
+## Further Exploration
+
+- [Computer use](../../../docs/subsystems/computer-use.md) — provider selection and shared-desktop limits.
+- [Cua Driver MCP provider](../../experimental/computer-use-cua-driver-mcp/README.md) — use an installed driver.
+- [Cua Driver native provider](../../experimental/computer-use-cua-driver-native/README.md) — use the npm runtime.
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
-None, as this package contributes no prompt, tool, message, or provider request.
+None, as this registry only records provider names.
 
 #### KV Cache effect
 
-None; this package never assembles model input.
+Registration does not alter model requests. Provider-owned tools and guidance determine their own request-prefix effects.
 
 ## Known Limitations and Deferred Work
 
-- **One desktop per composition** — the exclusive slot is the contract, so two desktops in one process would need a second composition rather than two providers.
-- **No approval seam of its own** — a provider decides whether desktop actions need `ctx.approval`; this definition deliberately carries no policy.
+<a id="known-limitations-and-deferred-work"></a>
+
+The service limits registrations within its Cordis service instance.
+
+- **Shared desktop** — concurrent Sessions and separate DSH processes can operate the same desktop; callers coordinate whole computer-use workflows.
+- **Provider selection** — configuration selects the provider; the model cannot switch registered drivers at runtime.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

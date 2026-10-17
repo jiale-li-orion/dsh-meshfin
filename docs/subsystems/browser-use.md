@@ -2,42 +2,41 @@
 
 English | [中文](browser-use.zh.md)
 
-Browser use lets a model inspect and operate web pages. `@deepseek-ai/dsh-browser-use` owns the capability definition — the `ctx.browserUse` service — and `@deepseek-ai/dsh-browser-use-playwright-mcp` is the provider this distribution mounts for Playwright's browser tools.
+Browser use lets a model inspect and operate web pages through a configured backend. DSH owns the task loop; the provider supplies browser operations and keeps browser state across turns of one live Session.
 
-## One browser backend per composition
+## Choose a provider
 
-The definition owns exactly one registration slot. `register(name)` reserves it until its disposer runs and returns that disposer; a second registration throws, including one repeating the current name, so a provider that restarted without releasing cannot silently take over. The name publishes through `providerName` for the registration's whole lifetime — including while the provider's resources are closing — so a released slot never overlaps a browser process that is still shutting down.
+Mount [`dsh-browser-use`](../../packages/browser-use/browser-use/README.md) and one provider in the same composition. The providers are experimental public npm packages and require explicit activation. Their initial browser engine is Chromium.
 
-The seam defines no tool, no transport, and no page-content policy. A provider owns its operations and their platform requirements, and a deployment that must not reach a live session or an authenticated profile should not mount one.
+| Provider | Integration |
+|---|---|
+| [Playwright MCP](../../packages/experimental/browser-use-playwright-mcp/README.md) | Playwright's browser-control MCP tools |
+| [Chrome DevTools MCP](../../packages/experimental/browser-use-chrome-devtools-mcp/README.md) | Chrome DevTools inspection and control through MCP |
+| [Stagehand](../../packages/experimental/browser-use-stagehand-native/README.md) | Native browser operations with AI-assisted actions, observation, and extraction |
 
-## How browser tools reach the model
+The shared service registers only a name and rejects any second provider, including another instance with the same name. It has no common browser-operation methods, browser resources, or model-controlled selector. Provider configuration in a profile or preset selects launch or attachment for that activation.
 
-The browser server is external. In this baseline the tools arrive through the row-based MCP client, so a composition mounts a companion row (`@deepseek-ai/dsh-mcp-client` starting `@playwright/mcp`) beside the provider; the server's own tool descriptions and results are what the model sees, and screenshots are ordinary images budgeted by the request pipeline.
+## Session ownership
 
-The provider owns the launch-versus-attach decision and rejects an unusable one before it reserves the slot; `browserServerArgs` derives the arguments the companion row must pass so the validated choice and the running server agree. Launch owns a browser for the whole composition — `--isolated` keeps it out of the user's own profile — while attach exclusively drives a browser a debugging endpoint already exposes.
+A launched browser belongs to the exact live Agent and Session that uses it. Calls across turns reuse that browser. Disposing the Session runtime closes its launched resources; reloading or forking a Session starts fresh browser state. Browser profiles and login state are not restored from the Session log.
 
-```yaml
-- id: mcp-playwright
-  name: '@deepseek-ai/dsh-mcp-client'
-  config:
-    serverName: playwright-mcp
-    transport: stdio
-    command: npx
-    args: ['-y', '@playwright/mcp@0.0.80', '--browser', 'chromium', '--isolated', '--headless']
-- name: '@deepseek-ai/dsh-browser-use'
-- name: '@deepseek-ai/dsh-browser-use-playwright-mcp'
-  config:
-    mode: launch
-    headless: true
-```
+An attached browser remains externally owned. The provider reserves it for one Session within that provider instance, preserves its existing browser state, and rejects simultaneous attachment by another Session. Teardown disconnects and leaves the external browser running. Separate DSH processes and other clients remain outside this reservation.
 
-Attaching instead replaces the launch arguments with `--cdp-endpoint <endpoint>` and drops `--isolated`. Installing the browser binary (`npx playwright install chromium`, plus its system libraries) stays with the deployment, and the server inherits ambient `PLAYWRIGHT_MCP_*` variables, so a composition blanks the ones it sets in the row's `env` map to keep this provider's choice authoritative.
+Provider shutdown stops tool admission and waits for owned work and resource cleanup before releasing the shared provider registration. Cancellation cannot undo a browser action already delivered.
 
-## Where the design came from
+## MCP initialization
 
-Absorbed from the official harness's browser-use group and its experimental providers. Their exclusive-registration seam, launch-versus-attach config, and endpoint validation are kept; the official per-Session MCP mounting is not ported, so the companion row owns the process while the provider owns the contract. This baseline does expose agent-scoped registration (`createScope`, `agent.ctx`), but its MCP client reserves each `serverName` once per process root, so per-Session servers would each need a distinct tool namespace. The Chrome DevTools and Stagehand backends are not ported: the first duplicates what the Chrome DevTools MCP server already offers as a plain row, and the second adds a hosted service this distribution does not depend on.
+An MCP provider initializes one client for each live Agent created after the provider loads. The existing serial `agent/created` event awaits connection and discovery before creation or resume completes and queued input runs. The client remains with the Session across turns. Startup failure or cancellation rejects creation or resume and triggers client cleanup.
 
-See also: [`@deepseek-ai/dsh-browser-use`](../../packages/browser-use/browser-use/README.md) and [`@deepseek-ai/dsh-browser-use-playwright-mcp`](../../packages/browser-use/browser-use-playwright-mcp/README.md).
+If an attachment is busy, that activation continues without the browser and does not retry on later turns. After release, a newly created or resumed activation can acquire it. Loading or reloading the provider does not adopt already active Sessions; the [shared runtime](../../packages/experimental/browser-use-runtime/README.md) owns these initialization rules.
+
+## Tools and recorded results
+
+Provider tools use the normal DSH execution pipeline and Session log. The providers own their tool schemas, result rendering, image support, configuration, and upstream limitations; the shared service adds no model-visible content. Stagehand's AI-assisted operations use its explicitly configured native model while DSH retains the task loop. DSH model routing, credential reuse, underlying inference request/response capture, and integration into Session usage accounting are deferred; returned SDK data and metadata remain ordinary logged tool results.
+
+Browser MCP connections also expose [resources and server instructions](mcp.md). Resource calls addressed to a browser server use its Session queue and reject other Sessions; server instructions are assembled only for its owning Session.
+
+The [decision record](../../.agents/notes/implemented/architecture/2026-09-12-browser-use-provider-registration.md) explains the registration-only service and per-Session ownership.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -45,26 +44,24 @@ See also: [`@deepseek-ai/dsh-browser-use`](../../packages/browser-use/browser-us
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxbrowseruse--browseruseregistry"></a>
 
 ### `ctx.browserUse` — `BrowserUseRegistry`
 
-Owns the single optional provider registration of the browser-use capability.
+Owns one optional provider registration in the shared browser-use service.
 
 ```ts cordis-catalog
 /**
  * Reserve the sole provider slot until the contribution is disposed.
- * A second registration fails even when it repeats the current name.
- * Providers must stop their tools and await owned browser work before
- * releasing this registration, so a released slot never overlaps a browser
- * process that is still shutting down.
+ * A second registration fails even when it repeats the current name. Providers
+ * must stop their tools and await owned work before releasing this registration.
  * @param name - provider-owned name used in registration diagnostics.
  * @returns the effect disposer for this exact registration.
  */
 register(name: BrowserUseProviderName): () => Promise<void>
 ```
 
-Source: [`packages/browser-use/browser-use/src/index.ts:22`](../../packages/browser-use/browser-use/src/index.ts)
+Source: [`packages/browser-use/browser-use/src/index.ts`](../../packages/browser-use/browser-use/src/index.ts)
 <!-- END GENERATED cordis-surface -->

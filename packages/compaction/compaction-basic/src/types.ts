@@ -8,9 +8,11 @@ import type { LlmCallConfig } from '@deepseek-ai/dsh-llm'
 
 /** Policy fields shared by the default policy and exact model overrides. */
 export interface CompactionPolicyConfig {
-  /** Compact at this fraction of the model's context window. Defaults to `0.8`. */
+  /** Window fraction for pressure; capped at context window minus reserved output and `headroomTokens`. Defaults to `0.8`. */
   thresholdRatio?: number
-  /** Recent context retained as a fraction of the model's window. Defaults to `0.16`. */
+  /** Additional pressure headroom beyond the routed output reservation. Non-negative integer; defaults to `65536`. */
+  headroomTokens?: number
+  /** Recent context retained as a fraction of context window minus reserved output tokens. Defaults to `0.16`. */
   retainRatio?: number
   /** Absolute recent-context budget; mutually exclusive with `retainRatio`. */
   retainTokens?: number
@@ -18,20 +20,12 @@ export interface CompactionPolicyConfig {
   summarizationProvider?: string
   /** Summary model; set together with `summarizationProvider`, or inherit the conversation target. */
   summarizationModel?: string
-  /** Automatic and `/compact` summarization output cap. Defaults to `8192`. */
+  /** Provider generation cap for summarization. Defaults to the resolved `headroomTokens`; an explicit cap must be positive. */
   maxTokens?: number
   /** Extra attempts after the first compaction when pressure remains above threshold. Defaults to `1`. */
   compactionRetries?: number
   /** Maximum retries after canonical context overflow; `0` disables recovery. Defaults to `1`. */
   maxOverflowRetries?: number
-  /** Selected-input fraction used for a reviewed range's output budget. Defaults to `0.25`. */
-  preparationOutputRatio?: number
-  /** Minimum reviewed-range output budget before model and context caps. Defaults to `16000`. */
-  preparationMinOutputTokens?: number
-  /** Maximum reviewed-range output budget before model and context caps. Defaults to `128000`. */
-  preparationMaxOutputTokens?: number
-  /** Maximum concurrent range-preparation provider calls. Defaults to `2`. */
-  preparationConcurrency?: number
 }
 
 /** Exact provider/model override merged over the default compaction policy. */
@@ -58,15 +52,12 @@ export type ResolvedRetention =
 /** Validated policy fields shared before and after exact-target matching. */
 interface ResolvedPolicyFields {
   readonly thresholdRatio: number
+  readonly headroomTokens: number
   readonly summarizationProvider: string
   readonly summarizationModel: string
   readonly maxTokens: number
   readonly compactionRetries: number
   readonly maxOverflowRetries: number
-  readonly preparationOutputRatio: number
-  readonly preparationMinOutputTokens: number
-  readonly preparationMaxOutputTokens: number
-  readonly preparationConcurrency: number
 }
 
 /** Validated immutable config whose target-specific defaults remain unresolved. */
@@ -81,7 +72,8 @@ export type ResolvedTargetPolicy = ResolvedPolicyFields & ResolvedRetention & {
 }
 
 /** One routed model's concrete pressure and retention budget. */
-export type ResolvedCompactSpec = Omit<ResolvedTargetPolicy, 'retainRatio' | 'retainTokens'> & {
+export type ResolvedCompactSpec = Omit<ResolvedTargetPolicy, 'retainRatio' | 'retainTokens' | 'headroomTokens'> & {
+  /** Adapter-declared full window; token budgets below exclude reserved output tokens. */
   readonly contextWindow: number
   readonly thresholdTokens: number
   readonly retainTokens: number

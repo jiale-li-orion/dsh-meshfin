@@ -1,22 +1,45 @@
 /** Raster inspection: full decode at admission, header-only probe on verified reads. */
 
-import sharp, { type FormatEnum, type Sharp } from 'sharp'
+import type { Sharp } from 'sharp'
 import { AttachmentError } from '@deepseek-ai/dsh-attachment'
 import type { ImageMediaType } from '@deepseek-ai/dsh-attachment'
+import { requireSharp } from './sharp.ts'
 
 /** Decoded metadata from a supported image. */
 export interface DetectedImage {
   mediaType: ImageMediaType
+  /** Intrinsic width with EXIF orientation applied — the width a viewer perceives. */
   width: number
+  /** Intrinsic height with EXIF orientation applied — the height a viewer perceives. */
   height: number
+  /** Whether the container carries more than one frame. */
+  animated: boolean
+  /** Whether the bytes carry descriptive metadata, a color profile, or orientation. */
+  carriesMetadata: boolean
+  /** Sharp sample depth reported for the decoded channels. */
+  depth: string
+  /** Sharp colour space reported for the decoded pixels. */
+  space: string
+  /** Whether decoded pixels carry an alpha channel. */
+  hasAlpha: boolean
 }
 
-/** Encoder to keep when an image has to be downscaled. */
-const ENCODERS: Readonly<Record<ImageMediaType, keyof FormatEnum>> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpeg',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
+/**
+ * Check alpha metadata for bytes produced by this package's encoders.
+ * Sharp/libvips may omit an all-opaque alpha plane from WebP output; every
+ * other addition or removal indicates that the encoded result is incompatible
+ * with its source facts.
+ * @param sourceHasAlpha - whether the source bytes declare an alpha plane, or undefined when the source frame is unspecified.
+ * @param output - decoded media type and alpha metadata from the encoded result.
+ * @returns whether the output alpha metadata is compatible with the source.
+ */
+export function encodedAlphaIsCompatible(
+  sourceHasAlpha: boolean | undefined,
+  output: Pick<DetectedImage, 'mediaType' | 'hasAlpha'>,
+): boolean {
+  return sourceHasAlpha === undefined
+    || output.hasAlpha === sourceHasAlpha
+    || (sourceHasAlpha && !output.hasAlpha && output.mediaType === 'image/webp')
 }
 
 const MEDIA_TYPES: Readonly<Record<string, ImageMediaType>> = {
@@ -26,13 +49,36 @@ const MEDIA_TYPES: Readonly<Record<string, ImageMediaType>> = {
   gif: 'image/gif',
 }
 
+function carriesRetainedMetadata(metadata: Awaited<ReturnType<Sharp['metadata']>>): boolean {
+  return metadata.exif !== undefined
+    || metadata.xmp !== undefined
+    || metadata.iptc !== undefined
+    || metadata.icc !== undefined
+    || metadata.hasProfile
+    || metadata.tifftagPhotoshop !== undefined
+    || metadata.comments !== undefined
+    || metadata.orientation !== undefined
+}
+
 async function imageMetadata(image: Sharp): Promise<DetectedImage> {
   const metadata = await image.metadata()
   const mediaType = MEDIA_TYPES[metadata.format as string]
   if (mediaType === undefined) {
     throw new AttachmentError('Unsupported or malformed image data.', 'INVALID_IMAGE')
   }
-  return { mediaType, width: metadata.width, height: metadata.height }
+  // EXIF orientations 5-8 transpose the stored raster; report the perceived
+  // axes so limits, source facts, and coordinate advice all share them.
+  const transposed = metadata.orientation !== undefined && metadata.orientation >= 5
+  return {
+    mediaType,
+    width: transposed ? metadata.height : metadata.width,
+    height: transposed ? metadata.width : metadata.height,
+    animated: (metadata.pages ?? 1) > 1,
+    carriesMetadata: carriesRetainedMetadata(metadata),
+    depth: metadata.depth,
+    space: metadata.space,
+    hasAlpha: metadata.hasAlpha,
+  }
 }
 
 /**
@@ -44,6 +90,7 @@ async function imageMetadata(image: Sharp): Promise<DetectedImage> {
  * @returns verified format and dimensions.
  */
 export async function probeImage(data: Uint8Array): Promise<DetectedImage> {
+  const sharp = requireSharp()
   try {
     return await imageMetadata(sharp(data, { failOn: 'error', limitInputPixels: false }))
   } catch (error) {
@@ -52,53 +99,30 @@ export async function probeImage(data: Uint8Array): Promise<DetectedImage> {
   }
 }
 
-/**
- * Downscale one image whose longest side exceeds the deployment's edge cap.
- * Vision routes refuse an image wider or taller than their decoder's limit
- * (DeepSeek reports `invalid_request_error` above 8192 pixels per side), and
- * refusing it here would leave long screenshots unreadable, so the bytes are
- * re-encoded at the cap in their own format — animation included — before they
- * become durable.
- * @param data - complete encoded image bytes.
- * @param mediaType - media type the caller declared for those bytes.
- * @param maxEdge - longest side to keep; a smaller image is returned unchanged.
- * @param maxPixels - decoded-pixel admission limit.
- * @returns the bytes to store, unchanged when they already fit.
- */
-export async function fitImageEdge(
-  data: Uint8Array,
-  mediaType: ImageMediaType,
-  maxEdge: number,
-  maxPixels?: number,
-): Promise<Uint8Array> {
-  const detected = await detectImage(data, maxPixels)
-  if (detected.mediaType !== mediaType) {
-    throw new AttachmentError('Declared image type does not match its bytes.', 'IMAGE_TYPE_MISMATCH')
-  }
-  if (Math.max(detected.width, detected.height) <= maxEdge) return data
-  const scale = maxEdge / Math.max(detected.width, detected.height)
-  const width = Math.max(1, Math.round(detected.width * scale))
-  const height = Math.max(1, Math.round(detected.height * scale))
-  const resized = sharp(data, {
-    failOn: 'error',
-    limitInputPixels: false,
-    animated: mediaType === 'image/gif' || mediaType === 'image/webp',
-  }).resize({ width, height, fit: 'inside', withoutEnlargement: true })
-  return new Uint8Array(await resized.toFormat(ENCODERS[mediaType]).toBuffer())
+/** Admission limits applied to a decoded raster's intrinsic dimensions. */
+export interface DecodedImageLimits {
+  /** Decoded-pixel (width times height) admission limit. */
+  maxPixels?: number
+  /** Per-side admission limit applied to width and height independently. */
+  maxDimension?: number
 }
 
 /**
  * Fully decode a supported raster and return its intrinsic metadata.
  * @param data - complete encoded image bytes.
- * @param maxPixels - decoded-pixel admission limit.
+ * @param limits - intrinsic-dimension admission limits.
  * @returns verified format and dimensions.
  */
-export async function detectImage(data: Uint8Array, maxPixels?: number): Promise<DetectedImage> {
+export async function detectImage(data: Uint8Array, limits?: DecodedImageLimits): Promise<DetectedImage> {
+  const sharp = requireSharp()
   try {
     const image = sharp(data, { failOn: 'error', limitInputPixels: false })
     const detected = await imageMetadata(image)
-    if (maxPixels !== undefined && detected.width * detected.height > maxPixels) {
+    if (limits?.maxPixels !== undefined && detected.width * detected.height > limits.maxPixels) {
       throw new AttachmentError('Image exceeds the configured decoded-pixel limit.', 'IMAGE_TOO_MANY_PIXELS')
+    }
+    if (limits?.maxDimension !== undefined && Math.max(detected.width, detected.height) > limits.maxDimension) {
+      throw new AttachmentError('Image exceeds the configured per-side pixel limit.', 'IMAGE_DIMENSION_TOO_LARGE')
     }
     await image.raw().toBuffer()
     return detected

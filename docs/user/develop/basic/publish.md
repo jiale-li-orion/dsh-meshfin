@@ -4,7 +4,7 @@ English | [中文](publish.zh.md)
 
 The previous tutorials loaded a local plugin through a `--patch` overlay. This tutorial packages it as an installable **bundle**, installs it into a **profile** with `dsh plugin add`, and explains the layer order that determines the composed configuration. It assumes the `dsh` CLI is installed. Complete [plugin configuration](./config.md) first.
 
-To use a fresh source checkout instead, complete the [first-launch section](../../../../README.md#1-the-computer), keep this tutorial's `hello-plugin` directory at the repository root, and run the remaining `dsh ...` commands from there as `pnpm dsh ...`. See [source execution](../../../../apps/cli/reference/README.md#source-execution) for build and launcher behavior.
+To use a fresh source checkout instead, complete the [run-from-source section](../../../../README.md#run-from-source), keep this tutorial's `hello-plugin` directory at the repository root, and run the remaining `dsh ...` commands from there as `pnpm dsh ...`. See [source execution](../../../../apps/cli/reference/README.md#source-execution) for build and launcher behavior.
 
 ## Two concepts, two manifests
 
@@ -53,7 +53,7 @@ export function apply() {
 }
 ```
 
-Create `hello-plugin/cordis.patch.yml`. The patch is a YAML array like the `--patch` overlays you have been writing, except plugin rows reference the package by name instead of a relative source path so Node resolution finds the installed code:
+Create `hello-plugin/cordis.patch.yml`. The patch is a YAML array like the `--patch` overlays you wrote, except plugin rows reference the package by name instead of a relative source path so Node resolution finds the installed code:
 
 ```yaml
 - insert:
@@ -61,7 +61,9 @@ Create `hello-plugin/cordis.patch.yml`. The patch is a YAML array like the `--pa
       name: dsh-hello-plugin
 ```
 
-A package without the `dsh.bundle` declaration still installs, but only as a plain dependency: `dsh plugin` prints a warning and activates no layer. Use that package format for a library that plugin packages import rather than a plugin users enable.
+`patch` also accepts an ordered list of files, for example `["./base.patch.yml", "./web.patch.yml"]`; the launcher applies them in that order as one layer, and each file's relative plugin paths resolve beside that file. A package without the `dsh.bundle` declaration still installs, but only as a plain dependency: `dsh plugin` prints a warning and activates no layer. Use that package format for a library that plugin packages import rather than a plugin users enable.
+
+Declare the DSH releases the bundle supports with an `engines.dsh` SemVer range, for example `"engines": { "dsh": ">=0.2.0 <0.3.0" }`. Installation and profile startup refuse a bundle whose range the running DSH does not satisfy; without `engines.dsh`, they check its `@deepseek-ai/dsh*` peer dependency ranges instead ([rule](../../../../packages/boot/app-boot/README.md#profiles)).
 
 ### The profile manifest
 
@@ -70,7 +72,7 @@ A profile directory holds two files:
 - `package.json` — the profile's out-of-tree plugin dependencies (managed by pnpm) plus the `dsh.profile` manifest with its ordered `bundles` list.
 - `cordis.patch.yml` — the user's own patch layer, applied after every bundle layer.
 
-You never write a profile manifest by hand: `dsh plugin` creates and maintains it. The next section shows the result.
+You never write a profile manifest by hand: `dsh --profile <name> --from-default-profile <template>` can create or reset one from a shipped application template, while `dsh plugin` creates a base-backed profile and maintains its installed bundle list. The [CLI behavior reference](../../../../apps/cli/reference/README.md#profile-boot) owns the creation rules; the next section shows the plugin path.
 
 ## Install into a profile
 
@@ -99,6 +101,12 @@ The first use initializes the profile (with `@deepseek-ai/dsh-base` as its first
   }
 }
 ```
+
+A linked checkout keeps its own `node_modules`. Declare dsh packages whose instances the plugin must share with the host under both `peerDependencies` and `devDependencies`, as the harness packages do. At that manifest's lookup position, peers present in the running dsh's runtime resolution use the installation's copy; the devDependency copy serves your type checker and standalone tests. Keep independently versioned third-party dependencies and stateless dsh utilities under `dependencies`.
+
+Ordinary linked imports follow Node's ancestor order and check each directory's current peer declarations. A nearer physical package wins before a higher peer declaration. A link target can lack `package.json`; ancestor peers still apply, even without a physical `node_modules` beside that manifest. Explicit `require.resolve(..., { paths })` is always native, including paths inside a profile. These rules are shared by npm, Desktop, and source launches; they do not invalidate loaded modules or validate peer version ranges. See the [resolution rules](../../../../.agents/notes/implemented/architecture/2026-09-19-profile-resolution-lookup-order.md) for scope and file-query behavior.
+
+Linking a broad checkout does not apply peer interception to the running installation's own package directories. Links whose targets stay inside the profile, including its pnpm store, remain profile-owned installation content rather than external linked roots. Overlapping external links do not change lookup order: each request still starts from its importer's directory.
 
 Verify the layer without booting, then boot:
 
@@ -160,7 +168,7 @@ dsh plugin --profile demo add github:you/hello-plugin
 
 But a git install fetches **sources, not built artifacts**: nothing runs your `build` script, so a TypeScript package arrives without its `lib/` output and fails to load. Two things must happen, one on each side:
 
-- **The author** ships a `prepare` script — pnpm runs it after a git install — that builds the published entry points from source, self-contained: it must not assume dev-only context such as a sibling monorepo checkout. [turtle-ui](https://github.com/deepseek-harness/turtle-ui) is a working example: its `prepare` runs a dedicated tsdown config that transpiles `src/` without project references or type checking.
+- **The author** ships a `prepare` script — pnpm runs it after a git install — that builds the published entry points from source, self-contained: it must not assume dev-only context such as a sibling monorepo checkout. A dedicated tsdown config can transpile `src/` without project references or type checking.
 - **The user** allowlists the build. pnpm ≥10 refuses to run a git dependency's `prepare` script until it is explicitly allowed, so the first `add` fails; `dsh` points at the fix — copy the exact package key pnpm printed into the profile's `pnpm-workspace.yaml`:
 
   ```yaml
@@ -170,7 +178,7 @@ But a git install fetches **sources, not built artifacts**: nothing runs your `b
 
   and re-run the `add`.
 
-Treat that allowance as what it is: **permission to execute the package's code on your machine at install time**, outside any sandbox the agent runs under. Only allow packages whose source you trust, and pin a commit (`github:you/hello-plugin#<sha>`) so a later push cannot silently change what runs.
+Treat that allowance as **permission to execute the package's code on your machine at install time**, outside any sandbox the agent runs under. Only allow packages whose source you trust, and pin a commit (`github:you/hello-plugin#<sha>`) so a later push cannot silently change what runs.
 
 If you would rather not ask users for the allowance, distribute built artifacts instead — neither form needs any build permission:
 
@@ -179,5 +187,5 @@ If you would rather not ask users for the allowance, distribute built artifacts 
 
 ## Next steps
 
-- [Plugins and lifecycle](../framework/) — the full plugin lifecycle
+- [Plugins and lifecycle](../framework/index.md) — the full plugin lifecycle
 - [CLI behavior reference](../../../../apps/cli/reference/README.md) — exact layer precedence, flags, and profile mechanics

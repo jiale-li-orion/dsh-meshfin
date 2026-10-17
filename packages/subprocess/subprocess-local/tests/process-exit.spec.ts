@@ -15,7 +15,8 @@ interface TreeState { root: number; descendant: number }
 
 const repoRoot = fileURLToPath(new URL('../../../../', import.meta.url))
 const hostScript = fileURLToPath(new URL('./fixtures/process-exit-host.ts', import.meta.url))
-const scenarioTimeoutMs = 30_000
+const scenarioTimeoutMs = process.platform === 'win32' ? 60_000 : 30_000
+const testTimeoutMs = scenarioTimeoutMs + 15_000
 
 function processExists(pid: number): boolean {
   try {
@@ -29,22 +30,8 @@ function processExists(pid: number): boolean {
 
 async function readTree(path: string): Promise<TreeState> {
   return vi.waitFor(async () => {
-    // The child writes this file while the test polls it, and a killed child can
-    // leave it empty or half-written. Both are "not ready yet" for a polling
-    // helper: the parse must retry, and the failure it finally reports has to say
-    // which of the two it saw.
-    let text: string
-    try {
-      text = await readFile(path, 'utf8')
-    } catch (error: unknown) {
-      throw new Error(`managed-tree state unreadable: ${String((error as NodeJS.ErrnoException).code ?? error)}`)
-    }
-    let state: Partial<TreeState>
-    try {
-      state = JSON.parse(text) as Partial<TreeState>
-    } catch {
-      throw new Error(`managed-tree state is not complete JSON yet: ${JSON.stringify(text.slice(0, 120))}`)
-    }
+    const text = await readFile(path, 'utf8')
+    const state = JSON.parse(text) as Partial<TreeState>
     if (!Number.isSafeInteger(state.root) || !Number.isSafeInteger(state.descendant)
       || (state.root ?? 0) <= 0 || (state.descendant ?? 0) <= 0 || state.root === state.descendant) {
       throw new Error(`invalid managed-tree state: ${text}`)
@@ -56,7 +43,7 @@ async function readTree(path: string): Promise<TreeState> {
 async function captureIdentities(inspector: ProcessInspector, state: TreeState): Promise<ProcessIdentity[]> {
   return vi.waitFor(() => {
     const expected = new Set([state.root, state.descendant])
-    const identities = inspector.processTree(state.root).filter(identity => expected.has(identity.pid))
+    const identities = inspector.snapshot().tree(state.root).filter(identity => expected.has(identity.pid))
     if (identities.length !== expected.size) throw new Error('managed tree is not fully observable yet')
     return identities
   }, { interval: 10, timeout: scenarioTimeoutMs })
@@ -120,11 +107,9 @@ async function runScenario(kind: ManagedKind, trigger: ExitTrigger) {
   let settled = false
   let treeGone = false
   try {
+    // The host validates tree.json before waiting for proceed, so observing it
+    // is sufficient readiness; a second marker only adds a redundant Windows poll.
     state = await readTree(join(root, 'tree.json'))
-    await vi.waitFor(() => readFile(join(root, 'ready'), 'utf8'), {
-      interval: 10,
-      timeout: scenarioTimeoutMs,
-    })
     if (process.platform !== 'win32') identities = await captureIdentities(createProcessInspector(), state)
     await writeFile(join(root, 'proceed'), 'proceed')
     const outcome = await child
@@ -133,9 +118,9 @@ async function runScenario(kind: ManagedKind, trigger: ExitTrigger) {
     treeGone = true
     const disposeCounts = trigger === 'dispose'
       ? JSON.parse(await readFile(join(root, 'dispose.json'), 'utf8')) as {
-        listenersBefore: number
-        listenersAfterLoad: number
-        listenersAfterDispose: number
+        ownedListenersAfterLoad: number
+        ownedListenersAfterDispose: number
+        unrelatedListenerPreserved: boolean
       }
       : undefined
     return { outcome, disposeCounts }
@@ -157,7 +142,7 @@ describe('synchronous cleanup on host exit', () => {
     { trigger: 'direct' as const, expectedCode: 23, diagnostic: undefined },
     { trigger: 'uncaught-exception' as const, expectedCode: 1, diagnostic: 'host-exit-uncaught-exception' },
     { trigger: 'unhandled-rejection' as const, expectedCode: 1, diagnostic: 'host-exit-unhandled-rejection' },
-  ])('removes an ordinary managed tree after $trigger', { timeout: 45_000 }, async ({
+  ])('removes an ordinary managed tree after $trigger', { timeout: testTimeoutMs }, async ({
     trigger,
     expectedCode,
     diagnostic,
@@ -170,7 +155,7 @@ describe('synchronous cleanup on host exit', () => {
 
   it.skipIf(process.platform === 'win32')(
     'removes a terminal root and descendant after direct exit',
-    { timeout: 45_000 },
+    { timeout: testTimeoutMs },
     async () => {
       const { outcome } = await runScenario('terminal', 'direct')
       expect(outcome.exitCode).toBe(23)
@@ -178,12 +163,13 @@ describe('synchronous cleanup on host exit', () => {
     },
   )
 
-  // Retried like the other real-process scenarios: the assertions are unchanged,
-  // and a run that fails twice still fails the gate.
-  it('preserves normal terminate-and-join disposal and removes the exit listener', { timeout: 45_000, retry: 2 }, async () => {
+  it('preserves normal terminate-and-join disposal and removes the exit listener', { timeout: testTimeoutMs }, async () => {
     const { outcome, disposeCounts } = await runScenario('ordinary', 'dispose')
     expect(outcome.exitCode).toBe(0)
-    expect(disposeCounts?.listenersAfterLoad).toBe((disposeCounts?.listenersBefore ?? 0) + 1)
-    expect(disposeCounts?.listenersAfterDispose).toBe(disposeCounts?.listenersBefore)
+    expect(disposeCounts).toEqual({
+      ownedListenersAfterLoad: 1,
+      ownedListenersAfterDispose: 0,
+      unrelatedListenerPreserved: true,
+    })
   })
 })

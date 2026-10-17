@@ -1,5 +1,0 @@
-# Gradle and Android build outputs: the shell is source, its APK is an artifact.
-build/
-.gradle/
-local.properties
-*.apk

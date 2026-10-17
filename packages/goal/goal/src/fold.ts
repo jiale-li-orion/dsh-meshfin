@@ -336,7 +336,7 @@ export function applyGoalEvent(state: GoalFoldState, event: SessionEvent): void 
  * @param events - session events in sequence order.
  * @returns a fresh durable projection; activation is deliberately absent.
  */
-export function foldGoal(events: Iterable<SessionEvent>): FoldedGoal {
+export function foldGoal(events: readonly SessionEvent[]): FoldedGoal {
   const state = emptyGoalFoldState()
   for (const event of events) applyGoalEvent(state, event)
   return {

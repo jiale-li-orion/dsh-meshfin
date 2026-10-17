@@ -4,23 +4,23 @@ import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { MessageId } from '@deepseek-ai/dsh-llm/brand'
-import SessionStore, {
+import SessionStore, { SessionLogOffset,
   SESSION_FORMAT_VERSION,
   Session,
   SessionId,
-  sessionLogCutFromEvents,
   type SessionEvent,
   type SessionHeader,
 } from '@deepseek-ai/dsh-session'
 import SessionPersistence, {
+  SessionAlreadyExistsError,
+  SessionHandleClosedError,
+  SessionPersistenceNotFoundError,
   SessionPersistenceRevision,
-  type SessionInspection,
-  type SessionLocation,
+  SessionReadOnlyError,
+  type SessionAccess,
+  type SessionHandle,
   type SessionPersistenceSnapshot,
 } from '@deepseek-ai/dsh-session-persistence'
-import Storage from '@deepseek-ai/dsh-storage'
-import * as StorageDomain from '@deepseek-ai/dsh-storage-domain'
-import * as StorageJson from '@deepseek-ai/dsh-storage-json'
 import MessageFeedbackService from '../src/index.ts'
 
 export interface MessageFixture {
@@ -28,7 +28,6 @@ export interface MessageFixture {
   readonly userMessageId: MessageId
   readonly assistantMessageIds: readonly [MessageId, MessageId]
   readonly emptyAssistantMessageId: MessageId
-  readonly replacementAssistantMessageId: MessageId
 }
 
 /** Append one deterministic transcript used by target-validation tests. */
@@ -45,7 +44,8 @@ export function appendMessageFixture(session: Session): Omit<MessageFixture, 'se
     content: [{ type: 'text', text: 'First answer' }],
     source: { provider: 'test', model: 'test' },
   })
-  const firstEvent = session.append('assistant/message', {
+  session.append('assistant/message', {
+    stream: [],
     turn: 1,
     step: 1,
     message: first,
@@ -55,6 +55,7 @@ export function appendMessageFixture(session: Session): Omit<MessageFixture, 'se
     source: { provider: 'test', model: 'test' },
   })
   session.append('assistant/message', {
+    stream: [],
     turn: 1,
     step: 1,
     message: second,
@@ -64,6 +65,7 @@ export function appendMessageFixture(session: Session): Omit<MessageFixture, 'se
     source: { provider: 'test', model: 'test' },
   })
   session.append('assistant/message', {
+    stream: [],
     turn: 1,
     step: 1,
     message: empty,
@@ -71,24 +73,10 @@ export function appendMessageFixture(session: Session): Omit<MessageFixture, 'se
   session.append('step/end', { turn: 1, step: 1 })
   session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 
-  const replacement = createAssistantMessage({
-    content: [{ type: 'text', text: 'Model-only replacement' }],
-    source: { provider: 'test', model: 'test' },
-  })
-  session.append('assistant/message', {
-    turn: 1,
-    step: 1,
-    message: replacement,
-  }, {
-    surfaceOp: { op: 'replace', start: firstEvent.seq, end: firstEvent.seq },
-    sourceEventSeqs: [firstEvent.seq],
-  })
-
   return {
     userMessageId: user.id,
     assistantMessageIds: [first.id, second.id],
     emptyAssistantMessageId: empty.id,
-    replacementAssistantMessageId: replacement.id,
   }
 }
 
@@ -102,92 +90,108 @@ export function messageFixture(
     version: SESSION_FORMAT_VERSION,
     id,
     createdAt: options.createdAt ?? 1_700_000_000_000,
+    isSeeded: false,
     ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
   }
   const session = Session.create(id, [], header)
   return { session, ...appendMessageFixture(session) }
 }
 
+/** One stored session in the in-memory test backend. */
+interface StoredSession {
+  readonly meta: SessionHeader
+  events: readonly SessionEvent[]
+}
+
 /** Minimal controllable persistence provider for service-level tests. */
 class TestPersistence extends SessionPersistence {
-  override readonly supportsRawArtifacts = false
+  readonly durable = new Map<SessionId, StoredSession>()
+  readFailure: Error | undefined
+  appendFailure: Error | undefined
+  flushFailure: Error | undefined
+  openCalls: SessionAccess[] = []
+  closeCalls = 0
+  appendCalls = 0
+  statCalls = 0
+  readCalls = 0
+  onRead: (() => void | Promise<void>) | undefined
+  onStat: (() => void | Promise<void>) | undefined
 
-  static inject = ['sessions']
-
-  readonly durable = new Map<SessionId, SessionInspection>()
-  readonly logical = new Map<SessionId, { meta: SessionHeader; events: readonly SessionEvent[] }>()
-  inspectFailure: Error | undefined
-  inspectCalls = 0
-  readFromCalls = 0
-  onReadFrom: (() => void | Promise<void>) | undefined
-  onListSnapshots: (() => void | Promise<void>) | undefined
-
-  locate(_meta: SessionHeader): SessionLocation | undefined { return undefined }
-  create(_meta: SessionHeader): Promise<void> { return Promise.resolve() }
-  append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> { return Promise.resolve() }
-
-  async load(id: SessionId): Promise<SessionInspection> {
-    const stored = await this.readFrom(id, 0)
-    return inspectionFromEvents(stored.meta, stored.events)
+  async create(header: SessionHeader): Promise<SessionHandle> {
+    if (this.durable.has(header.id)) throw new SessionAlreadyExistsError(header.id)
+    const stored: StoredSession = { meta: header, events: [] }
+    this.durable.set(header.id, stored)
+    return this.handle(stored, 'write')
   }
 
-  inspect(id: SessionId): Promise<SessionInspection> {
-    this.inspectCalls += 1
-    if (this.inspectFailure !== undefined) return Promise.reject(this.inspectFailure)
-    const explicit = this.logical.get(id)
-    if (explicit !== undefined) return Promise.resolve(inspectionFromEvents(explicit.meta, explicit.events))
-    const live = this.ctx.sessions.get(id)
-    if (live !== undefined) {
-      const log = live.readLog()
-      return Promise.resolve({ meta: live.header, log, events: log.materialize() })
-    }
+  // Appends are durable on resolution here; nothing buffers, so the service-wide flush is a no-op.
+  async flush(): Promise<void> {}
+
+  async open(id: SessionId, access: SessionAccess): Promise<SessionHandle> {
+    this.openCalls.push(access)
     const stored = this.durable.get(id)
-    return stored === undefined
-      ? Promise.reject(new Error(`test persistence: session '${id}' not found`))
-      : Promise.resolve(stored)
+    if (stored === undefined) throw new SessionPersistenceNotFoundError(id)
+    return this.handle(stored, access)
   }
 
-  async readFrom(
-    id: SessionId,
-    fromSeq: number,
-  ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
-    this.readFromCalls += 1
-    await this.onReadFrom?.()
+  async stat(id: SessionId): Promise<SessionPersistenceSnapshot | undefined> {
+    this.statCalls += 1
+    await this.onStat?.()
     const stored = this.durable.get(id)
-    return stored === undefined
-      ? Promise.reject(new Error(`test persistence: session '${id}' not found`))
-      : { meta: stored.meta, events: [...stored.log.values(fromSeq)] }
+    if (stored === undefined) return undefined
+    return { header: stored.meta, revision: SessionPersistenceRevision(`test:${id}:${stored.events.length}`) }
   }
 
-  list(): Promise<SessionHeader[]> {
-    return Promise.resolve([...this.durable.values()].map(value => value.meta))
-  }
-
-  async listSnapshots(): Promise<SessionPersistenceSnapshot[]> {
-    await this.onListSnapshots?.()
-    return [...this.durable.values()].map((value, index) => ({
-      header: value.meta,
-      revision: SessionPersistenceRevision(`test:${index}:${value.log.length}`),
+  async list(): Promise<SessionPersistenceSnapshot[]> {
+    return [...this.durable.entries()].map(([id, stored]) => ({
+      header: stored.meta,
+      revision: SessionPersistenceRevision(`test:${id}:${stored.events.length}`),
     }))
   }
 
+  private handle(stored: StoredSession, access: SessionAccess): SessionHandle {
+    let closed = false
+    const handle: SessionHandle = {
+      id: stored.meta.id,
+      header: stored.meta,
+      inheritedEventCount: SessionLogOffset(0),
+      access,
+      read: async (offset = 0, length?: number) => {
+        if (closed) throw new SessionHandleClosedError(stored.meta.id, 'read')
+        this.readCalls += 1
+        if (this.readFailure !== undefined) throw this.readFailure
+        await this.onRead?.()
+        const events = stored.events.filter(event => event.seq >= offset)
+        return {
+          eventState: 'detached',
+          events: structuredClone(length === undefined ? events : events.slice(0, length)),
+        }
+      },
+      append: async (events) => {
+        if (closed) throw new SessionHandleClosedError(stored.meta.id, 'append')
+        if (access !== 'write') throw new SessionReadOnlyError(stored.meta.id, 'append')
+        if (this.appendFailure !== undefined) throw this.appendFailure
+        this.appendCalls += 1
+        stored.events = [...stored.events, ...events]
+      },
+      flush: async () => {
+        if (closed) throw new SessionHandleClosedError(stored.meta.id, 'flush')
+        if (access !== 'write') throw new SessionReadOnlyError(stored.meta.id, 'flush')
+        if (this.flushFailure !== undefined) throw this.flushFailure
+      },
+      close: async () => { closed = true; this.closeCalls += 1 },
+      [Symbol.asyncDispose]() { return handle.close() },
+    }
+    return handle
+  }
+
   persist(session: Session): void {
-    const log = session.readLog()
-    this.durable.set(session.id, { meta: session.header, log, events: log.materialize() })
+    this.durable.set(session.id, { meta: session.header, events: [...session.snapshotEvents()] })
   }
 
-  setDurable(source: { meta: SessionHeader; events: readonly SessionEvent[] }): void {
-    this.durable.set(source.meta.id, inspectionFromEvents(source.meta, source.events))
+  setDurable(stored: StoredSession): void {
+    this.durable.set(stored.meta.id, stored)
   }
-}
-
-/** Adapt one expanded test fixture to the production inspection contract. */
-function inspectionFromEvents(
-  meta: SessionHeader,
-  events: readonly SessionEvent[],
-): SessionInspection {
-  const log = sessionLogCutFromEvents(events)
-  return { meta, log, events: log.materialize() }
 }
 
 export interface TestHarness {
@@ -198,7 +202,7 @@ export interface TestHarness {
   dispose(): Promise<void>
 }
 
-/** Compose the service over the real storage hub/domain/JSON backend. */
+/** Compose feedback over a controllable Session persistence backend. */
 export async function setupHarness(maxNoteBytes = 64): Promise<TestHarness> {
   const root = await mkdtemp(join(tmpdir(), 'dsh-message-feedback-test-'))
   const ctx = new Context()
@@ -206,9 +210,6 @@ export async function setupHarness(maxNoteBytes = 64): Promise<TestHarness> {
   try {
     await ctx.plugin(SessionStore)
     await ctx.plugin(TestPersistence)
-    await ctx.plugin(Storage)
-    await ctx.plugin(StorageJson, { root })
-    await ctx.plugin(StorageDomain, { backend: 'json' })
     const feedbackFiber = await ctx.plugin(MessageFeedbackService, { maxNoteBytes })
     disposeFeedback = feedbackFiber.dispose
   } catch (error) {

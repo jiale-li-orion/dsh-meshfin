@@ -2,37 +2,33 @@
 
 English | [中文](computer-use.zh.md)
 
-Computer use lets a model observe and operate a desktop. `@deepseek-ai/dsh-computer-use` owns the capability definition — the `ctx.computerUse` service — and `@deepseek-ai/dsh-computer-use-cua-driver` is the provider this distribution mounts for a [Cua Driver](https://github.com/trycua/cua) desktop.
+Computer use lets a model observe and operate the local desktop through a configured provider. The shared DSH capability is called **computer use**; **Cua Driver** names the upstream implementation.
 
-## One desktop per composition
 
-The definition owns exactly one registration slot. `register(name)` reserves it until its disposer runs and returns that disposer; a second registration throws, including one repeating the current name, so a provider that restarted without releasing cannot silently take over. The name publishes through `providerName` for the registration's whole lifetime — including while the provider's resources are closing — so a released slot never overlaps a closing desktop session.
+The [`macOS CUA provider`](../../packages/experimental/cua-macos/README.md) uses the [shared CUA objects and executor](../../packages/experimental/cua/README.md), which enforce application consent through User Questions and profile configuration.
 
-The seam defines no tool, no transport, and no approval policy: the provider owns its operations and their platform requirements, and a deployment whose approval policy does not match desktop input control should not mount one.
+## Choose a provider
 
-## How a desktop reaches the model
+Mount [`dsh-computer-use`](../../packages/computer-use/computer-use/README.md) and one provider in the same composition. Both Cua Driver providers are experimental public npm packages and require explicit activation.
 
-The driver is external. In this baseline the tools arrive through the row-based MCP client, so a composition mounts a companion row (`@deepseek-ai/dsh-mcp-client` with `command: cua-driver, args: [mcp]`) beside the provider; the driver's own tool descriptions and results are what the model sees. Screenshots are ordinary images: they arrive through the durable attachment store and are budgeted by the request pipeline like any other image, which is why the provider refuses to activate without an attachment service and a model route declaring `image` input.
+| Provider | Runtime |
+|---|---|
+| [Cua Driver MCP](../../packages/experimental/computer-use-cua-driver-mcp/README.md) | An already installed `cua-driver` executable connected through MCP |
+| [Cua Driver native](../../packages/experimental/computer-use-cua-driver-native/README.md) | The platform-native runtime installed with the npm dependency |
 
-```yaml
-- id: mcp-cua-driver
-  name: '@deepseek-ai/dsh-mcp-client'
-  config:
-    serverName: cua-driver
-    transport: stdio
-    command: cua-driver
-    args: [mcp]
-- name: '@deepseek-ai/dsh-computer-use'
-- name: '@deepseek-ai/dsh-computer-use-cua-driver'
-```
+Each provider supplies its upstream tool catalog. The shared service registers only a name and rejects any second provider, including another instance with the same name. It has no common desktop-operation methods or model-controlled selector.
 
-The driver's installation and its platform grants stay with that program: on a Windows desktop driven from a WSL harness, it belongs on the Windows side, reachable from the parent shell.
+## Lifetime and desktop sharing
 
-## Where the design came from
+A provider retains its registration while it shuts down its tools and owned resources. Startup failure releases the attempted registration. The MCP provider keeps its registration during reconnects.
 
-Absorbed from the official harness's computer-use group and its experimental Cua Driver providers. Their exclusive-registration seam and screenshot prerequisites are kept; the official per-Session MCP mounting needs scope APIs newer than this baseline and is not ported, and the native (in-process SDK) provider is deliberately not ported because its crashes would terminate the harness process.
+One registered provider does not reserve a desktop for a Session. Callers coordinate complete observe, act, and verify workflows across Sessions and separate DSH processes. A cancelled call cannot undo input that the desktop already received.
 
-See also: [`@deepseek-ai/dsh-computer-use`](../../packages/computer-use/computer-use/README.md) and [`@deepseek-ai/dsh-computer-use-cua-driver`](../../packages/computer-use/computer-use-cua-driver/README.md).
+## Results and platform requirements
+
+Tools use the normal execution pipeline and Session log. Image-capable model routes with an attachment store receive durable screenshots; unsupported image routes receive the existing MCP image diagnostic. Provider READMEs own installation, permission, and platform limitations.
+
+The [decision record](../../.agents/notes/implemented/architecture/2026-09-12-computer-use-provider-registration.md) explains the registration-only service and the two Cua Driver integrations.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 
@@ -40,25 +36,24 @@ See also: [`@deepseek-ai/dsh-computer-use`](../../packages/computer-use/computer
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxcomputeruse--computeruseregistry"></a>
 
 ### `ctx.computerUse` — `ComputerUseRegistry`
 
-Owns the single optional provider registration of the computer-use capability.
+Owns one optional provider registration in the shared computer-use service.
 
 ```ts cordis-catalog
 /**
  * Reserve the sole provider slot until the contribution is disposed.
- * A second registration fails even when it repeats the current name.
- * Providers must stop their tools and await owned work before releasing this
- * registration, so a released slot never overlaps a closing desktop session.
+ * A second registration fails even when it repeats the current name. Providers
+ * must stop their tools and await owned work before releasing this registration.
  * @param name - provider-owned name used in registration diagnostics.
  * @returns the effect disposer for this exact registration.
  */
 register(name: ComputerUseProviderName): () => Promise<void>
 ```
 
-Source: [`packages/computer-use/computer-use/src/index.ts:22`](../../packages/computer-use/computer-use/src/index.ts)
+Source: [`packages/computer-use/computer-use/src/index.ts`](../../packages/computer-use/computer-use/src/index.ts)
 <!-- END GENERATED cordis-surface -->

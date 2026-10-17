@@ -1,11 +1,10 @@
 CLAUDE.local.md
 .env
+apps/desktop/.env.windows
+apps/desktop/.env.macos
+apps/desktop/*.p12
 node_modules/
 lib/
-# The archived-session bundle ships its runtime library as source.
-!community/bundles/archived-sessions/lib/
-!community/bundles/archived-sessions/lib/index.js
-!community/bundles/archived-sessions/lib/client.js
 *.tsbuildinfo
 pnpm-debug.log
 .pnpm-store/
@@ -15,6 +14,7 @@ examples/*/*.jsonl
 .sessions/
 examples/*/.sessions/
 coverage/
+.coverage-times.json
 .doc-typecheck-*/
 .node-next-types-*/
 .oxlint-contract-*/
@@ -30,34 +30,20 @@ tmp/
 .idea
 mise.toml
 dist-exe/
-python/sdk-runtime/src/deepseek_harness_runtime/runtime/dsh-jsonrpc-agent-*
-python/sdk-runtime/src/deepseek_harness_runtime/runtime/node/
+/dist/
+apps/desktop/.desktop-build/
+python/sdk-runtime/src/deepseek_harness_runtime/runtime/
 python/**/__pycache__/
-__pycache__/
 python/**/.pytest_cache/
+packages/**/__pycache__/
 apps/web/dist/
 .artifacts/
+.dsh-build/
+.dsh-report/
 .playwright-mcp/
 .orig
 .worktrees/
 worktrees/
 .agents/worktrees/
 .typert-*/
-
-# The shell installer is a local build artifact, served but never committed.
-apps/web/public/*.apk
-# Session uploads are workspace data, not repository content.
-uploads/
-
-# Agent workflow scratch (plans and implementation specs written while working on
-# this repository): local working material, never part of the published tree.
-docs/superpowers/
-
-# Personal working material: the evolution journal and the 进化/ planning, design,
-# and deployment records stay on disk for the person who runs this deployment,
-# not in the published tree.
-DSH进化日志.md
-进化/
-
-# Release output: packed tarballs and assembled portable distributions.
-dist/
+native/system/test/bin/
