@@ -47,3 +47,15 @@ worktrees/
 .agents/worktrees/
 .typert-*/
 native/system/test/bin/
+
+# Meshfin distribution material: personal working records and packaging output
+# that live on disk for whoever runs this deployment, not in the published tree.
+uploads/
+docs/superpowers/
+DSH进化日志.md
+进化/
+apps/web/public/*.apk
+# The archived-session bundle ships its runtime library as source.
+!community/bundles/archived-sessions/lib/
+!community/bundles/archived-sessions/lib/index.js
+!community/bundles/archived-sessions/lib/client.js

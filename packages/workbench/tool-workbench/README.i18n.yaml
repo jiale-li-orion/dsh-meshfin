@@ -1,0 +1,37 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/workbench/tool-workbench/README.md
+/deepseek-ai-dsh-tool-workbench:
+  en: e2d5f104d34697ed
+  zh: c97e471698f6778d
+/deepseek-ai-dsh-tool-workbench/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-tool-workbench/model-experience/tool-schemas:
+  en: 3039bc5e7a796b21
+  zh: 6b7a9eaf69c9ea53
+/deepseek-ai-dsh-tool-workbench/model-experience/tool-schemas/what-the-model-sees:
+  en: 014b34d8a0945eba
+  zh: ef9ed2d8e0ee1a03
+/deepseek-ai-dsh-tool-workbench/model-experience/tool-schemas/token-effect:
+  en: 3ce42a9605c3596c
+  zh: dd87ba7e72f10c58
+/deepseek-ai-dsh-tool-workbench/model-experience/tool-schemas/kv-cache-effect:
+  en: 24266e9d669810a2
+  zh: 4523b54bf16a0e19
+/deepseek-ai-dsh-tool-workbench/model-experience/results-and-notices:
+  en: 8160e01d6bfc5e0c
+  zh: 570dc95be7f13260
+/deepseek-ai-dsh-tool-workbench/model-experience/results-and-notices/what-the-model-sees:
+  en: c4a2910290596022
+  zh: 7cb0a69df4d49042
+/deepseek-ai-dsh-tool-workbench/model-experience/results-and-notices/token-effect:
+  en: 7172a68d528e4f36
+  zh: 4bdb5c6f706be6ad
+/deepseek-ai-dsh-tool-workbench/model-experience/results-and-notices/kv-cache-effect:
+  en: f5d5f97a153f7c70
+  zh: 74ee91dded5baf1e
+/deepseek-ai-dsh-tool-workbench/known-limitations-and-deferred-work:
+  en: 6214999444b20f90
+  zh: 4698ba06aa1a2dc4

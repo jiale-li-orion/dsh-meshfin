@@ -534,5 +534,7 @@
     { "path": "./apps/plugin-market-generator" },
     { "path": "./apps/desktop-host" },
     { "path": "./apps/desktop/tsconfig.host.json" }
-  ]
+  ,
+    { "path": "./packages/workbench/workbench" },
+    { "path": "./packages/workbench/tool-workbench" }]
 }
