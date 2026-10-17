@@ -10,14 +10,15 @@ import { isDeepStrictEqual } from 'node:util'
 import {
   CompactionId,
   ManualCompactionError,
+  compactionPreparationDigest,
   compactCheckpointSource,
   toolPairingBalancedAfter,
   toolPairingBalancedBefore,
 } from '@deepseek-ai/dsh-compaction'
-import type { CompactionResult } from '@deepseek-ai/dsh-compaction'
+import type { CompactionPreparation, CompactionResult } from '@deepseek-ai/dsh-compaction'
 import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
 import { createUserMessage, errorChain } from '@deepseek-ai/dsh-llm'
-import type { Message, UserMessage } from '@deepseek-ai/dsh-llm'
+import type { ContentBlock, Message, UserMessage } from '@deepseek-ai/dsh-llm'
 import type { TokenMeasurement, TokenMeter } from '@deepseek-ai/dsh-token-meter'
 import { SessionSeq, type Session, type SessionEvent } from '@deepseek-ai/dsh-session'
 import type { Agent } from '@deepseek-ai/dsh-agent'
@@ -50,6 +51,7 @@ interface PreparedCompaction extends SurfaceSelection {
 
 type SummarizedCompaction = PreparedCompaction & SummaryResult & {
   readonly checkpointMessage: UserMessage
+  readonly summarySource?: 'generated' | 'human' | 'model'
 }
 
 interface CompactionTransactionOptions {
@@ -61,6 +63,10 @@ interface CompactionTransactionOptions {
   readonly flush?: () => Promise<void>
   /** Manual command that initiated this transaction, when present. */
   readonly sourceCommandId?: CommandId
+  /** Reviewed preparation correlated with this standard bracket. */
+  readonly preparationId?: CompactionPreparation['request']['preparationId']
+  /** Origin of the final reviewed summary. */
+  readonly summarySource?: 'generated' | 'human' | 'model'
 }
 
 interface CompactionEntryState {
@@ -205,6 +211,7 @@ export async function compactSurfaceRegion(
   const lifecycle = {
     compactionId,
     ...options.sourceCommandId === undefined ? {} : { sourceCommandId: options.sourceCommandId },
+    ...options.preparationId === undefined ? {} : { preparationId: options.preparationId },
     turn: owner,
   }
   const startEvent = session.append('compaction/start', lifecycle)
@@ -229,10 +236,13 @@ export async function compactSurfaceRegion(
       assertStable,
       signal,
     )
+    const reviewed = options.summarySource === undefined
+      ? summarized
+      : { ...summarized, summarySource: options.summarySource }
     if (options.owner === null) signal?.throwIfAborted()
-    assertStable(dependencies, session, summarized)
+    assertStable(dependencies, session, reviewed)
     stage = 'commit'
-    const pending = commitCompactionBody(session, startEvent, summarized)
+    const pending = commitCompactionBody(session, startEvent, reviewed)
     closing = true
     const endEvent = session.append('compaction/end', lifecycle)
     closed = true
@@ -273,6 +283,98 @@ export async function compactSurfaceRegion(
   /* v8 ignore next -- every path without a result records and throws a failure above. */
   if (result === undefined) throw new Error('compaction committed without a result')
   return result
+}
+
+/**
+ * Commit one reviewed durable preparation through the standard bracket.
+ * @param dependencies - token meter and the summary-error recovery hook revalidated
+ *   before opening the bracket.
+ * @param preparation - generated selection, chunks, calls, and summary.
+ * @param summary - reviewed final summary.
+ * @param source - generated, human-edited, or model-edited origin.
+ * @param owner - numbered open turn or standalone idle bracket.
+ * @param agent - Agent whose Session is mutated.
+ * @param signal - cancellation for maintenance and persistence.
+ * @param flush - durability checkpoint after the closed bracket.
+ * @returns the standard compaction result.
+ */
+export function commitPreparedSurfaceRegion(
+  dependencies: RegionDependencies,
+  preparation: CompactionPreparation,
+  summary: readonly ContentBlock[],
+  source: 'generated' | 'human' | 'model',
+  owner: 'current-turn' | null,
+  agent: Agent,
+  signal: AbortSignal,
+  flush?: () => Promise<void>,
+): Promise<CompactionResult> {
+  signal.throwIfAborted()
+  assertPreparationCurrent(dependencies, agent.session, preparation)
+  const finalCall = [...preparation.calls].sort((left, right) => left.index - right.index).at(-1)
+  if (finalCall === undefined) {
+    throw new ManualCompactionError('summary', 'prepared compaction has no provider call')
+  }
+  const callProvenance = finalCall.llmStreamCall === true
+    ? { rawOutput: finalCall.rawOutput, llmStreamCall: true as const }
+    : finalCall.rawOutput === undefined ? {} : { rawOutput: finalCall.rawOutput }
+  return compactSurfaceRegion(
+    // The reviewed path replaces the summarizer with the recorded calls, but
+    // every other dependency, including the summary-error recovery hook,
+    // stays the caller's so the bracket behaves like any other transaction.
+    {
+      ...dependencies,
+      summarize: () => Promise.resolve({
+        summary: structuredClone([...summary]),
+        provider: finalCall.provider,
+        model: finalCall.model,
+        ...finalCall.maxTokens === undefined ? {} : { maxTokens: finalCall.maxTokens },
+        ...finalCall.usage === undefined ? {} : { usage: finalCall.usage },
+        ...callProvenance,
+      }),
+    },
+    agent.session,
+    preparation.request.start,
+    preparation.request.end,
+    agent,
+    {
+      owner,
+      stability: 'selected-span',
+      preparationId: preparation.request.preparationId,
+      summarySource: source,
+      ...flush === undefined ? {} : { flush },
+    },
+    signal,
+  )
+}
+
+/**
+ * Reject a preparation whose exact selected membership or route price changed.
+ * The comparison uses the same route-priced total the request recorded, so an
+ * adapter-owned visual price change invalidates a stale preparation too.
+ */
+function assertPreparationCurrent(
+  dependencies: RegionDependencies,
+  session: Session,
+  preparation: CompactionPreparation,
+): void {
+  let selection: SurfaceSelection
+  try {
+    selection = validateSurfaceRegion(session, preparation.request.start, preparation.request.end)
+  } catch (error: unknown) {
+    throw new ManualCompactionError('changed', 'the prepared context range is no longer current', { cause: error })
+  }
+  if (compactionPreparationDigest(selection.shadowedSeqs) !== preparation.request.shadowedDigest
+    || selection.shadowedSeqs.length !== preparation.request.shadowedSeqs.length
+    || selection.shadowedSeqs.some((seq, index) => seq !== preparation.request.shadowedSeqs[index])) {
+    throw new ManualCompactionError('changed', 'the prepared context range membership changed')
+  }
+  const selected = dependencies.meter.measure(session).nodes.slice(selection.startIdx, selection.endIdx + 1)
+  const tokens = selected.reduce((sum, node) => sum + node.tokens, 0)
+  if (selected.length !== selection.shadowedSeqs.length
+    || selected.some((node, index) => node.seq !== selection.shadowedSeqs[index])
+    || tokens !== preparation.request.shadowedTokenCount) {
+    throw new ManualCompactionError('changed', 'the prepared context range price changed')
+  }
 }
 
 /** Classify one closed manual attempt without weakening cancellation precedence. */
@@ -493,6 +595,10 @@ function commitCompactionBody(
     ...startEvent.data.sourceCommandId === undefined
       ? {}
       : { sourceCommandId: startEvent.data.sourceCommandId },
+    ...startEvent.data.preparationId === undefined
+      ? {}
+      : { preparationId: startEvent.data.preparationId },
+    ...summarized.summarySource === undefined ? {} : { summarySource: summarized.summarySource },
     summary,
     ...callRecord,
     shadowedRange: { start, end },

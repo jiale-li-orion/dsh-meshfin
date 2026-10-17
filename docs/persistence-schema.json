@@ -5676,7 +5676,7 @@
       "kind": "event",
       "event": "compaction/end",
       "surface": false,
-      "digest": "b0127044ab31a702bddfd785d345f5abd7a70876746e895ce443afa3e60ddf2d",
+      "digest": "4d3919957ede43aa31ce27dffa5efba3d208356a7abbfe0110c3df949d083fa6",
       "schema": {
         "root": 0,
         "nodes": [
@@ -5725,6 +5725,11 @@
                 "optional": true
               },
               {
+                "name": "preparationId",
+                "type": 2,
+                "optional": true
+              },
+              {
                 "name": "sourceCommandId",
                 "type": 2,
                 "optional": true
@@ -5763,6 +5768,1960 @@
           {
             "kind": "literal",
             "value": "compaction/end"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:compaction/preparation/attempted",
+      "kind": "event",
+      "event": "compaction/preparation/attempted",
+      "surface": false,
+      "digest": "efd52579f6a5f5f5ce0d8a3b5305a51263e857a8811e48494fb265c0b7ae8890",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 10,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 11,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attempt",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "preparationId",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "chunkIndexes",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "index",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "inputTokens",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "maxTokens",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "model",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "stage",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 4
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              7,
+              8,
+              9
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "direct"
+          },
+          {
+            "kind": "literal",
+            "value": "map"
+          },
+          {
+            "kind": "literal",
+            "value": "reduce"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "compaction/preparation/attempted"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:compaction/preparation/call",
+      "kind": "event",
+      "event": "compaction/preparation/call",
+      "surface": false,
+      "digest": "4c4f9b87693e7bfc268c74276688b623349346d41b5008463826e29f7304707e",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 39,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "call",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "preparationId",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              38
+            ]
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "chunkIndexes",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "index",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "llmStreamCall",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "maxTokens",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "model",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "rawOutput",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "stage",
+                "type": 33,
+                "optional": false
+              },
+              {
+                "name": "summary",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "usage",
+                "type": 37,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 5
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 9
+          },
+          {
+            "kind": "union",
+            "types": [
+              10,
+              12,
+              21,
+              24,
+              26,
+              28,
+              31
+            ]
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "arguments",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 11,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-call"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 13,
+                "optional": false
+              },
+              {
+                "name": "offloaded",
+                "type": 6,
+                "optional": true
+              },
+              {
+                "name": "type",
+                "type": 20,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "height",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "mediaType",
+                "type": 14,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 7,
+                "optional": true
+              },
+              {
+                "name": "originalDimensions",
+                "type": 19,
+                "optional": true
+              },
+              {
+                "name": "width",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              15,
+              16,
+              17,
+              18
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "image/gif"
+          },
+          {
+            "kind": "literal",
+            "value": "image/jpeg"
+          },
+          {
+            "kind": "literal",
+            "value": "image/png"
+          },
+          {
+            "kind": "literal",
+            "value": "image/webp"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "height",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "width",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "image"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 22,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 23,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 7,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "file"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 25,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "reasoning"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 27,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "text"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "tool",
+                "type": 29,
+                "optional": true
+              },
+              {
+                "name": "toolName",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 30,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "never"
+          },
+          {
+            "kind": "literal",
+            "value": "tool-addition"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "toolName",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 32,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-removal"
+          },
+          {
+            "kind": "union",
+            "types": [
+              34,
+              35,
+              36
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "direct"
+          },
+          {
+            "kind": "literal",
+            "value": "map"
+          },
+          {
+            "kind": "literal",
+            "value": "reduce"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "cacheReadTokens",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "cacheWriteTokens",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "inputTokens",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "outputTokens",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "reasoningTokens",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "totalTokens",
+                "type": 5,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "chunkIndexes",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "index",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "maxTokens",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "model",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "rawOutput",
+                "type": 8,
+                "optional": true
+              },
+              {
+                "name": "stage",
+                "type": 33,
+                "optional": false
+              },
+              {
+                "name": "summary",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "usage",
+                "type": 37,
+                "optional": true
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "compaction/preparation/call"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:compaction/preparation/discarded",
+      "kind": "event",
+      "event": "compaction/preparation/discarded",
+      "surface": false,
+      "digest": "879478b4c386c46c589a3aa8a3324dbd6c80b409d5cd509e970b35a6a1b9e646",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "preparationId",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "compaction/preparation/discarded"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:compaction/preparation/edited",
+      "kind": "event",
+      "event": "compaction/preparation/edited",
+      "surface": false,
+      "digest": "e9bf290e89fd4e44e20d8f278e1e115f3408fae45c91b1b693510bf6b8699b45",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 31,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 33,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "preparationId",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "source",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "summary",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              4,
+              5
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "human"
+          },
+          {
+            "kind": "literal",
+            "value": "model"
+          },
+          {
+            "kind": "array",
+            "element": 7
+          },
+          {
+            "kind": "union",
+            "types": [
+              8,
+              12,
+              14,
+              16,
+              19,
+              21,
+              23
+            ]
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 9,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 11,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "literal",
+            "value": "file"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 13,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "reasoning"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 15,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "text"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "tool",
+                "type": 17,
+                "optional": true
+              },
+              {
+                "name": "toolName",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 18,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "never"
+          },
+          {
+            "kind": "literal",
+            "value": "tool-addition"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "toolName",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 20,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-removal"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "arguments",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 22,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-call"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 24,
+                "optional": false
+              },
+              {
+                "name": "offloaded",
+                "type": 31,
+                "optional": true
+              },
+              {
+                "name": "type",
+                "type": 32,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "height",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "mediaType",
+                "type": 25,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "originalDimensions",
+                "type": 30,
+                "optional": true
+              },
+              {
+                "name": "width",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              26,
+              27,
+              28,
+              29
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "image/gif"
+          },
+          {
+            "kind": "literal",
+            "value": "image/jpeg"
+          },
+          {
+            "kind": "literal",
+            "value": "image/png"
+          },
+          {
+            "kind": "literal",
+            "value": "image/webp"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "height",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "width",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "image"
+          },
+          {
+            "kind": "literal",
+            "value": "compaction/preparation/edited"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:compaction/preparation/failed",
+      "kind": "event",
+      "event": "compaction/preparation/failed",
+      "surface": false,
+      "digest": "b6140f459b0b86a46c4e66d41adc2f9d87282b7c6ff8445ffd562f01a7772e5a",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attemptedCalls",
+                "type": 2,
+                "optional": true
+              },
+              {
+                "name": "error",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "preparationId",
+                "type": 3,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "compaction/preparation/failed"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:compaction/preparation/planned",
+      "kind": "event",
+      "event": "compaction/preparation/planned",
+      "surface": false,
+      "digest": "9f3d7e8251843c8950f92bd8f52c820d9485fcfec39350247a0379eabf79d9de",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 13,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 14,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "chunks",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "plan",
+                "type": 10,
+                "optional": false
+              },
+              {
+                "name": "preparationId",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "endSeq",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "estimatedTokens",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "index",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "inputDigest",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "part",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "parts",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "stage",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "startSeq",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              7,
+              8,
+              9
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "reduce"
+          },
+          {
+            "kind": "literal",
+            "value": "direct"
+          },
+          {
+            "kind": "literal",
+            "value": "map"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "contextWindow",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "desiredOutputTokens",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "directInputTokens",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "inputTokenBudget",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "model",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "modelMaxOutputTokens",
+                "type": 4,
+                "optional": true
+              },
+              {
+                "name": "outputTokenCap",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "provider",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "strategy",
+                "type": 11,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              8,
+              12
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "map-reduce"
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "compaction/preparation/planned"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:compaction/preparation/ready",
+      "kind": "event",
+      "event": "compaction/preparation/ready",
+      "surface": false,
+      "digest": "f69e6d9da606ba697f23804026f98248add7a84860f88f19347b639bf4be81e9",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 22,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 36,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "chunks",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "preparationId",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "summary",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 3
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "endSeq",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "estimatedTokens",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "index",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "inputDigest",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "part",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "parts",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "stage",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "startSeq",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "union",
+            "types": [
+              7,
+              8,
+              9
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "direct"
+          },
+          {
+            "kind": "literal",
+            "value": "map"
+          },
+          {
+            "kind": "literal",
+            "value": "reduce"
+          },
+          {
+            "kind": "array",
+            "element": 11
+          },
+          {
+            "kind": "union",
+            "types": [
+              12,
+              14,
+              24,
+              27,
+              29,
+              31,
+              34
+            ]
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "arguments",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "id",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 13,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-call"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 15,
+                "optional": false
+              },
+              {
+                "name": "offloaded",
+                "type": 22,
+                "optional": true
+              },
+              {
+                "name": "type",
+                "type": 23,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "height",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "mediaType",
+                "type": 16,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "originalDimensions",
+                "type": 21,
+                "optional": true
+              },
+              {
+                "name": "width",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              17,
+              18,
+              19,
+              20
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "image/gif"
+          },
+          {
+            "kind": "literal",
+            "value": "image/jpeg"
+          },
+          {
+            "kind": "literal",
+            "value": "image/png"
+          },
+          {
+            "kind": "literal",
+            "value": "image/webp"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "height",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "width",
+                "type": 4,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "image"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachment",
+                "type": 25,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 26,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "attachmentId",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "bytes",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "name",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "file"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 28,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "reasoning"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 30,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "text"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "tool",
+                "type": 32,
+                "optional": true
+              },
+              {
+                "name": "toolName",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 33,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "never"
+          },
+          {
+            "kind": "literal",
+            "value": "tool-addition"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "toolName",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 35,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-removal"
+          },
+          {
+            "kind": "literal",
+            "value": "compaction/preparation/ready"
+          }
+        ]
+      }
+    },
+    {
+      "key": "event:compaction/preparation/requested",
+      "kind": "event",
+      "event": "compaction/preparation/requested",
+      "surface": false,
+      "digest": "378cbd5f048342aeb4d07b8a9879164c634cfbbf37770ba1c9868d929e269fab",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 5,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 6,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "end",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "preparationId",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "preservationBrief",
+                "type": 3,
+                "optional": true
+              },
+              {
+                "name": "shadowedDigest",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "shadowedSeqs",
+                "type": 4,
+                "optional": false
+              },
+              {
+                "name": "shadowedTokenCount",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "start",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "unitCount",
+                "type": 2,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "array",
+            "element": 2
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "compaction/preparation/requested"
           }
         ]
       }
@@ -5868,7 +7827,7 @@
       "kind": "event",
       "event": "compaction/start",
       "surface": false,
-      "digest": "db874d463b0fdec77e9da1c4568f37cb70bd6596781eb93800db44fb8a116965",
+      "digest": "f7849b2a519208cc2518372a384a6e71c8fc29e9fc67c23c257a33c9fa684aec",
       "schema": {
         "root": 0,
         "nodes": [
@@ -5910,6 +7869,11 @@
                 "name": "compactionId",
                 "type": 2,
                 "optional": false
+              },
+              {
+                "name": "preparationId",
+                "type": 2,
+                "optional": true
               },
               {
                 "name": "sourceCommandId",
@@ -5959,7 +7923,7 @@
       "kind": "event",
       "event": "compaction/summary",
       "surface": false,
-      "digest": "e2f9a41e0989f54ed8cee80f8db2bcf9d60a5c810dc9d45b83fa050b9dce7602",
+      "digest": "c84cbe1b1dc7c59d5153e663e7bc103a0797776307bfac39dc49c7067c865967",
       "schema": {
         "root": 0,
         "nodes": [
@@ -5988,7 +7952,7 @@
               },
               {
                 "name": "type",
-                "type": 35,
+                "type": 39,
                 "optional": false
               }
             ],
@@ -5998,7 +7962,7 @@
             "kind": "union",
             "types": [
               2,
-              34
+              38
             ]
           },
           {
@@ -6023,6 +7987,11 @@
                 "name": "model",
                 "type": 3,
                 "optional": false
+              },
+              {
+                "name": "preparationId",
+                "type": 3,
+                "optional": true
               },
               {
                 "name": "provider",
@@ -6060,8 +8029,13 @@
                 "optional": false
               },
               {
-                "name": "usage",
+                "name": "summarySource",
                 "type": 33,
+                "optional": true
+              },
+              {
+                "name": "usage",
+                "type": 37,
                 "optional": true
               }
             ],
@@ -6088,101 +8062,12 @@
             "types": [
               8,
               10,
-              12,
-              15,
-              17,
               19,
-              28
+              22,
+              24,
+              26,
+              29
             ]
-          },
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "text",
-                "type": 3,
-                "optional": false
-              },
-              {
-                "name": "type",
-                "type": 9,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "literal",
-            "value": "reasoning"
-          },
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "text",
-                "type": 3,
-                "optional": false
-              },
-              {
-                "name": "type",
-                "type": 11,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "literal",
-            "value": "text"
-          },
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "tool",
-                "type": 13,
-                "optional": true
-              },
-              {
-                "name": "toolName",
-                "type": 3,
-                "optional": false
-              },
-              {
-                "name": "type",
-                "type": 14,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "primitive",
-            "type": "never"
-          },
-          {
-            "kind": "literal",
-            "value": "tool-addition"
-          },
-          {
-            "kind": "object",
-            "properties": [
-              {
-                "name": "toolName",
-                "type": 3,
-                "optional": false
-              },
-              {
-                "name": "type",
-                "type": 16,
-                "optional": false
-              }
-            ],
-            "indices": []
-          },
-          {
-            "kind": "literal",
-            "value": "tool-removal"
           },
           {
             "kind": "object",
@@ -6204,7 +8089,7 @@
               },
               {
                 "name": "type",
-                "type": 18,
+                "type": 9,
                 "optional": false
               }
             ],
@@ -6219,7 +8104,7 @@
             "properties": [
               {
                 "name": "attachment",
-                "type": 20,
+                "type": 11,
                 "optional": false
               },
               {
@@ -6229,7 +8114,7 @@
               },
               {
                 "name": "type",
-                "type": 27,
+                "type": 18,
                 "optional": false
               }
             ],
@@ -6255,7 +8140,7 @@
               },
               {
                 "name": "mediaType",
-                "type": 21,
+                "type": 12,
                 "optional": false
               },
               {
@@ -6265,7 +8150,7 @@
               },
               {
                 "name": "originalDimensions",
-                "type": 26,
+                "type": 17,
                 "optional": true
               },
               {
@@ -6279,10 +8164,10 @@
           {
             "kind": "union",
             "types": [
-              22,
-              23,
-              24,
-              25
+              13,
+              14,
+              15,
+              16
             ]
           },
           {
@@ -6326,12 +8211,12 @@
             "properties": [
               {
                 "name": "attachment",
-                "type": 29,
+                "type": 20,
                 "optional": false
               },
               {
                 "name": "type",
-                "type": 30,
+                "type": 21,
                 "optional": false
               }
             ],
@@ -6366,6 +8251,95 @@
             "kind": "object",
             "properties": [
               {
+                "name": "text",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 23,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "reasoning"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "text",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 25,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "text"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "tool",
+                "type": 27,
+                "optional": true
+              },
+              {
+                "name": "toolName",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 28,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "primitive",
+            "type": "never"
+          },
+          {
+            "kind": "literal",
+            "value": "tool-addition"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "toolName",
+                "type": 3,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 30,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "literal",
+            "value": "tool-removal"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
                 "name": "end",
                 "type": 5,
                 "optional": false
@@ -6381,6 +8355,26 @@
           {
             "kind": "array",
             "element": 5
+          },
+          {
+            "kind": "union",
+            "types": [
+              34,
+              35,
+              36
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "generated"
+          },
+          {
+            "kind": "literal",
+            "value": "model"
+          },
+          {
+            "kind": "literal",
+            "value": "human"
           },
           {
             "kind": "object",
@@ -6437,6 +8431,11 @@
                 "optional": false
               },
               {
+                "name": "preparationId",
+                "type": 3,
+                "optional": true
+              },
+              {
                 "name": "provider",
                 "type": 3,
                 "optional": false
@@ -6472,8 +8471,13 @@
                 "optional": false
               },
               {
-                "name": "usage",
+                "name": "summarySource",
                 "type": 33,
+                "optional": true
+              },
+              {
+                "name": "usage",
+                "type": 37,
                 "optional": true
               }
             ],
@@ -22404,6 +24408,11 @@
   ],
   "types": [
     {
+      "digest": "0082524a1d7e7805687d637687614c0d0132a5ae83595145bed027d1a5f9c704",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "00c054d3018c198d92f459563331edd1385e58345c677bb499791df2da0ade9f",
       "names": [
         "packages/session/session-title-llm/src/index.ts#SessionTitleLlmRequestEventData"
@@ -22585,6 +24594,13 @@
       "sources": []
     },
     {
+      "digest": "0c526b14bbdd37c73b7e64cff2b0905ac650ded4b002aac3a5b0ce73f0287403",
+      "names": [],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:292"
+      ]
+    },
+    {
       "digest": "0c556c9b9f2a96238a6b9bbb99e748206cbff2ed6203041c9571f04ae5802f52",
       "names": [],
       "sources": []
@@ -22755,6 +24771,11 @@
       ]
     },
     {
+      "digest": "18b5361ee64bb7666046eada46362a06cd4f7af9c5c4ea0cfea87f5de6632aa0",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "18dc21f12bbac8ade8377e6fbb54179e20c3d955d73fba3244c57fb6bf001df0",
       "names": [
         "packages/schedule/schedule/src/types.ts#ScheduleDeleteChange"
@@ -22846,6 +24867,11 @@
       ]
     },
     {
+      "digest": "1cd980b41efad86959905c9e347ba3b7d23683feebe606e6d430ff55beec5985",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "1cde1bedde79c5e8a56aee9c05c8e0a579cf5bc611deb85b93fa331a16ca978f",
       "names": [
         "packages/compaction/compaction-image-offload/src/projection.ts#ImageOffloadTarget"
@@ -22894,6 +24920,15 @@
       "digest": "1e346446e183ee76f48d7994c97ecb302bddc682abb60b8a10ea0bb26223a69c",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "1e3e49039c666a6f137988c7d749f09e38cfe0248cfd741fd10148400679e85d",
+      "names": [
+        "packages/compaction/compaction/src/types.ts#CompactionPreparationAttempt"
+      ],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:83"
+      ]
     },
     {
       "digest": "1e709346005826eb81809eeb76a3f713cf13ad6c5cec75146d07020ab9adc938",
@@ -22964,6 +24999,11 @@
     },
     {
       "digest": "224aa11d4d5f88c450822d01b99e6ca5e3a9c7f26a5ede10bae33384a09ef4dc",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "23266145d11c225773c22c1a8fde5a9106bf88ec7bcbc081bfb12a6d525c12f5",
       "names": [],
       "sources": []
     },
@@ -23241,6 +25281,11 @@
       ]
     },
     {
+      "digest": "378cbd5f048342aeb4d07b8a9879164c634cfbbf37770ba1c9868d929e269fab",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "378f90f9f6022a0991928a1eaf7991094ea1920fe89a9248358a1da106e1a970",
       "names": [],
       "sources": []
@@ -23367,14 +25412,19 @@
       "sources": []
     },
     {
-      "digest": "3e4e7683b0192c9f0e6a75c59076108f017892cdb302a98032c2632fd79c356f",
+      "digest": "3e8b352a718a92fa0c02f32b1b131b43b2df7288c62d204d0e2e369b76ef1970",
       "names": [],
       "sources": [
-        "packages/compaction/compaction/src/types.ts:24"
+        "packages/compaction/compaction/src/types.ts:268"
       ]
     },
     {
       "digest": "3ee93b06f3a125850337602bcdf155d2538c43a5c944ec55b1b3c365152d6796",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "3f05aee3efaf263c717e09ef51dbf6ec1ee493a8efb52913af80c580da33d168",
       "names": [],
       "sources": []
     },
@@ -23449,6 +25499,11 @@
       ]
     },
     {
+      "digest": "4747b6dc59c0b6ab466e3acbd68e4652b026b8bad96886dc59ec9777e502bb16",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "477614bca595a9e7adb5a1870be446b9a8684f3ba8950259d6289f2d3b74f028",
       "names": [],
       "sources": [
@@ -23493,6 +25548,20 @@
     },
     {
       "digest": "49dab019d00e8c26f27ad2ccff7b604d69e323ae4d17e0d2a7b6b8a830b1ade2",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "49e88377a806dddf3146a580c77530ef62b8f3bcd02f7c828bf4b0860b2d5a5b",
+      "names": [
+        "packages/compaction/compaction/src/types.ts#CompactionPreparationRequest"
+      ],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:18"
+      ]
+    },
+    {
+      "digest": "4a7b714392178107bb1aa8cb9244422b9a52a85ee3c37143774770983a6247fe",
       "names": [],
       "sources": []
     },
@@ -23546,11 +25615,17 @@
       ]
     },
     {
+      "digest": "4c4f9b87693e7bfc268c74276688b623349346d41b5008463826e29f7304707e",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "4cd48f3e5108bd6ebedf7301c3638839b8b2b9db8dbd493974177fbdeb91a01b",
       "names": [
         "packages/api/session-controller/src/types.ts#SessionRequestId",
         "packages/attachment/attachment/src/brand.ts#AttachmentId",
         "packages/compaction/compaction/src/brand.ts#CompactionId",
+        "packages/compaction/compaction/src/brand.ts#CompactionPreparationId",
         "packages/core/session/src/types.ts#SessionId",
         "packages/experimental/agent-team/src/types.ts#TeamId",
         "packages/experimental/agent-team/src/types.ts#TeamMessageId",
@@ -23577,6 +25652,7 @@
         "packages/api/session-controller/src/types.ts:409",
         "packages/attachment/attachment/src/brand.ts:6",
         "packages/compaction/compaction/src/brand.ts:4",
+        "packages/compaction/compaction/src/brand.ts:7",
         "packages/core/session/src/types.ts:21",
         "packages/experimental/agent-team/src/types.ts:21",
         "packages/experimental/agent-team/src/types.ts:33",
@@ -23599,6 +25675,11 @@
         "packages/session/session-title/src/types.ts:17",
         "packages/workflow/workflow/src/types.ts:13"
       ]
+    },
+    {
+      "digest": "4d3919957ede43aa31ce27dffa5efba3d208356a7abbfe0110c3df949d083fa6",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "4e011753f8263f436efaabfbb3b4db53a98fc55342c5ded2daf7208b217be159",
@@ -23628,6 +25709,11 @@
       "sources": [
         "packages/subagent/subagent/src/continuation-messages.ts:29"
       ]
+    },
+    {
+      "digest": "4ebb49508d54760579c12e613635515f950e72aaee942286feb8ba3241e47678",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "4edec1b770e8ec4ce1220bf42edc5ac46713a1b48d4caa778dcfc98bad1f28a3",
@@ -23748,11 +25834,6 @@
       "sources": []
     },
     {
-      "digest": "576a2de8355eb09850963ff5953420b172e274d9283666eb7d889097db120796",
-      "names": [],
-      "sources": []
-    },
-    {
       "digest": "5776e5553ff2dfe3f5bc202dbb1e7c9f93e35a531aebb7764c23b2b6153b2ccc",
       "names": [],
       "sources": []
@@ -23790,6 +25871,15 @@
       "digest": "58f94390b982f8a5ac1f4f235ba612557f4a1dc4a995d8b1cec63ce7639decb0",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "5a3fc3bfcbb9c2ec07fa3c04ed49293b059a17eb48c8532bec0450e7cbe26f4b",
+      "names": [
+        "packages/compaction/compaction/src/types.ts#CompactionPreparationChunk"
+      ],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:63"
+      ]
     },
     {
       "digest": "5abab3a27fd2736660ecddd94b28d6bbf114986dd894880153bd1be3ccacb563",
@@ -23871,7 +25961,7 @@
       "digest": "5dd766ccd1702a1142ad8b4bd44f2242f8e8a6752669ad3de0a5d224329b1438",
       "names": [],
       "sources": [
-        "packages/compaction/compaction/src/types.ts:82"
+        "packages/compaction/compaction/src/types.ts:246"
       ]
     },
     {
@@ -23947,6 +26037,15 @@
       "sources": []
     },
     {
+      "digest": "633b3cd0e0a7f34d36de75374af132912f892a14cd90ccf441af2c3269566b80",
+      "names": [
+        "packages/compaction/compaction/src/types.ts#CompactionPreparationStage"
+      ],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:38"
+      ]
+    },
+    {
       "digest": "6487b10ba7542f3c447b1e41a1c6a590b7bfafe0b9b66b49f34028da85bb970f",
       "names": [
         "packages/subagent/subagent/src/descriptor.ts#ContinuableSubagentDescriptorData"
@@ -23954,6 +26053,11 @@
       "sources": [
         "packages/subagent/subagent/src/descriptor.ts:72"
       ]
+    },
+    {
+      "digest": "64a6b9bfaf4c7f819018e074627ed54dd115acd27c3765da516cf209d41b65d1",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "6598cd6da253948d6b207c6374a45335804c79b576866d6215649c2d1bc85e25",
@@ -24033,6 +26137,11 @@
       "sources": []
     },
     {
+      "digest": "6a58ba7b55f795f8a2c9c20a85cf0ad28ea3bf3ab26022bb5bee714b22f9a4bc",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "6ab45ac76839722df912f3ba50f1c6b41f2d614bde11f1aabfae04117ccdc80d",
       "names": [],
       "sources": []
@@ -24050,6 +26159,11 @@
       "sources": [
         "packages/goal/goal/src/types.ts:60"
       ]
+    },
+    {
+      "digest": "6bc58b048a36a75e8af780346bd3df0ef243fea6688be5d7829aebb39f541389",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "6bc8e51124d0874bc89e1d0ceff381a9c3cd0fc240667d69f841ce4f60f65fe5",
@@ -24237,6 +26351,11 @@
       ]
     },
     {
+      "digest": "796a7be04e8195b974aaf33c4762fc37d6dd57aeaceddd99e34264351f00c804",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "79a4c87f8bfb4d6d05cd9952b99210d6a7db3b478c4a01d94b4c50602308c056",
       "names": [],
       "sources": []
@@ -24252,6 +26371,13 @@
       "digest": "7a651f3b672c52fb615f22c0ce9cb3cc5b22aad92e6bbeefb0808fd7b9233a50",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "7a7f472f3a97ef0236445b6516a8ae5a5882d9a7f5728e7d2b007dc05348e8ee",
+      "names": [],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:263"
+      ]
     },
     {
       "digest": "7af85bf70d4eafce63e739adae38ea85501e68df3a0e22f97f3a0be90fd9e4cb",
@@ -24488,7 +26614,17 @@
       "sources": []
     },
     {
+      "digest": "879478b4c386c46c589a3aa8a3324dbd6c80b409d5cd509e970b35a6a1b9e646",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "87b1a33564b9a4d63b00988a524c12259243953aebb9c9a05127d87b27464df9",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "87e5601a3b1deade049f0e0f215d9a4e71e03afd4838aae0aa481620eb28f143",
       "names": [],
       "sources": []
     },
@@ -24608,6 +26744,11 @@
       "sources": []
     },
     {
+      "digest": "905341069b78bb33b37a3f5b0eac635e8c93d1496258a35791b0734e8134b50d",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "930c1cd289def119d443e19dd90008916bf035f0a4d23e07241e7f050f2b89b7",
       "names": [
         "packages/interaction/user-approval/src/types.ts#ApprovalOutcome"
@@ -24615,6 +26756,11 @@
       "sources": [
         "packages/interaction/user-approval/src/types.ts:32"
       ]
+    },
+    {
+      "digest": "934c5a128a2ad99dc85f8c20e872b07899de367e054e0cbf626fdd2f221076a8",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "935c8d486292b13c87b57ca280eb8c58b5b2f5239be86fcd4334c33fdeb87682",
@@ -24661,12 +26807,24 @@
       "sources": []
     },
     {
+      "digest": "95a9668f7fe364e8083b1babc10283e4cd76e0d04d4db39c56e5604dac6bc64f",
+      "names": [],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:279"
+      ]
+    },
+    {
       "digest": "95c0e88fcf0bafb2087f912ad9e2369de6ae6530cc0c4c2772c96205b57f7f60",
       "names": [],
       "sources": []
     },
     {
       "digest": "9645cf93769a6dfb227bd400bd6cb9fa7bab9140f4a851e4ae92514ade6e3114",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "9663e90c9e60121f0f53ba36d98ff958b0c090606aa81b2c732b7881506ad364",
       "names": [],
       "sources": []
     },
@@ -24698,11 +26856,6 @@
     },
     {
       "digest": "99135d8a3937977955eaac5f8f04f930dcd1562f8450a54a51cde9b921dd59a6",
-      "names": [],
-      "sources": []
-    },
-    {
-      "digest": "9947aa5938fe19a895298da412917acbf9ffb5093a73ab8baa257e6ae9e63a07",
       "names": [],
       "sources": []
     },
@@ -24787,8 +26940,8 @@
       "digest": "9e41386b3a0c9572b0d63078492ebb3997da7d3a830d44e0259418bd02f4bcb2",
       "names": [],
       "sources": [
-        "packages/compaction/compaction/src/types.ts:38",
-        "packages/compaction/compaction/src/types.ts:84"
+        "packages/compaction/compaction/src/types.ts:195",
+        "packages/compaction/compaction/src/types.ts:248"
       ]
     },
     {
@@ -24799,9 +26952,21 @@
       ]
     },
     {
+      "digest": "9f3d7e8251843c8950f92bd8f52c820d9485fcfec39350247a0379eabf79d9de",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "9f65c43e340bba31cdc0fc37bd93ccb68d5e9b36f47a68c207e95a8e68620a5d",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "9ff20211846d5c7da51a50fac48c14b728f770b79adf473e867ab6f172bc7ed6",
+      "names": [],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:257"
+      ]
     },
     {
       "digest": "a0a2e5c42e1c929445ecd1cd70f49be6b66441894ec72c08e8ae332821d4a3cb",
@@ -24849,6 +27014,11 @@
       "sources": []
     },
     {
+      "digest": "a22f969aad39e564749dc23f7f4c54ddab136e7d59367c4cb7067729a0217c82",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "a2b49331716ba0a7078b026d145306a70eae64b7313c3e6204bd931e75ec3bb1",
       "names": [],
       "sources": [
@@ -24881,6 +27051,11 @@
       "sources": [
         "packages/experimental/agent-team/src/types.ts:232"
       ]
+    },
+    {
+      "digest": "a5a6ae55d266cea958aaf47c06a108bbe9d576304ce24acae924379db7d355fe",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "a6567ccb2e530606b775371eb4fa31468d72084339968e8b0440a516a23b39dc",
@@ -24936,6 +27111,11 @@
       "sources": []
     },
     {
+      "digest": "a8b34a1ffb6f8da8a69e31d2ab3029485b9427c92a17e434d0cfb44e910c2f23",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "a9059a81430b320792bbb7c2ee1f8f6c77ff71e40ee44c18aec72e157c522694",
       "names": [],
       "sources": []
@@ -24951,11 +27131,6 @@
     },
     {
       "digest": "a927d444c928ac0efd9dd8b2e7d7d04d711c264cb71578d81e0e2fd143ff669f",
-      "names": [],
-      "sources": []
-    },
-    {
-      "digest": "a99ec0993c62c058e50af9f68922202a3b54f5e259bc2abf1915a73381d2316d",
       "names": [],
       "sources": []
     },
@@ -25090,11 +27265,6 @@
       "sources": []
     },
     {
-      "digest": "b0127044ab31a702bddfd785d345f5abd7a70876746e895ce443afa3e60ddf2d",
-      "names": [],
-      "sources": []
-    },
-    {
       "digest": "b062078e899958f99ae464514578b8c093924dfe34bd9a835932b420ff2150b1",
       "names": [],
       "sources": []
@@ -25119,6 +27289,11 @@
     },
     {
       "digest": "b1664fa89f8eab49a14e7e3168d8bc4da4aa9fd76332f6c4a053d839e5276ae7",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "b184c97430aa46fa86c7534c5a2aa1f2d169ee14c07f00f1a7e0f4b4ad010fb8",
       "names": [],
       "sources": []
     },
@@ -25208,6 +27383,11 @@
       "sources": []
     },
     {
+      "digest": "b6140f459b0b86a46c4e66d41adc2f9d87282b7c6ff8445ffd562f01a7772e5a",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "b63b089a00b3b9357675b3e0c3d3e9aa4fdbda1fba9c91a6b0c59ffdbb89f505",
       "names": [
         "packages/schedule/schedule/src/types.ts#LegacyAtScheduleRecord"
@@ -25242,6 +27422,15 @@
       "digest": "b765ee31033cea463863faf3fc6a0a1b85c47c6a2f13fe1ce833abe56105114b",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "b77e7d45f774dc5eb4159a682d2e6dacfb9f45a42624d83b8843578071e01860",
+      "names": [
+        "packages/compaction/compaction/src/types.ts#CompactionPreparationCall"
+      ],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:101"
+      ]
     },
     {
       "digest": "b79641a9d25e756636dc0c706fdf3c4583ccb7d4920e009e6e86c0759cf4de4c",
@@ -25356,6 +27545,11 @@
       "sources": []
     },
     {
+      "digest": "c06a305a74ac477b5b19beac5f434680eb1d61405ca6371e1d94b60176b68225",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "c0ea97bc89dfc46fa94eab956f5c3ee6af2f964aa7db6327cb18b451f207bef7",
       "names": [
         "packages/workflow/tool-workflow/src/types.ts#ToolWorkflowAgentEndData"
@@ -25448,6 +27642,11 @@
       "sources": []
     },
     {
+      "digest": "c84cbe1b1dc7c59d5153e663e7bc103a0797776307bfac39dc49c7067c865967",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "c8e6f48878cc2a2f0dc59682280d81f407943fb503f32c64bf9ff3d9393c3eff",
       "names": [],
       "sources": []
@@ -25463,13 +27662,6 @@
       "sources": []
     },
     {
-      "digest": "ca59530d1a4f3e191b4032bc4a20eded0d827db8b5a7efb27b3af9e9b456c6f2",
-      "names": [],
-      "sources": [
-        "packages/compaction/compaction/src/types.ts:72"
-      ]
-    },
-    {
       "digest": "cb1c8959e1726f82f9a3d2ef2bc90bf8c451a98fd56175e956022124c770c818",
       "names": [],
       "sources": []
@@ -25483,6 +27675,13 @@
       "digest": "cbca49bde16b656d5b8fbe4a8a507769f7b594c6287782b809c03814941bc5e3",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "cbe94572a9183c30dab26fd3317d04008ee960703983c0c5a8aed8ab8ad264d0",
+      "names": [],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:171"
+      ]
     },
     {
       "digest": "cd186c309e2bef305705e1d324139240f5e681f4f6a957d6a25b0225f65560df",
@@ -25562,6 +27761,13 @@
       "sources": []
     },
     {
+      "digest": "d66bad4e8131cdbcea64f64314f96b6aca4fe4c89c8e4e508e69ace9f23f3732",
+      "names": [],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:285"
+      ]
+    },
+    {
       "digest": "d66e11dddf5dfa3c71547e2cbd7b0608824cd8d6243fc16f532017ff28e8fba5",
       "names": [],
       "sources": []
@@ -25580,6 +27786,13 @@
       "digest": "d9196086e41e4dd5c2ce87f5c25529c8112a1731d258cf0728747d41a9ee3241",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "d98dbfe403643568dcc5c63981ef9b44fadf354023de8287f52e6b32abf8be11",
+      "names": [],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:273"
+      ]
     },
     {
       "digest": "d9c462b9f62fdd3efc76a44b9524dc8781f6b91cd9c7e584b17d971defafebab",
@@ -25614,11 +27827,6 @@
     },
     {
       "digest": "db6c5246911d47a7969f6b4cb47c7d0dbbde75c402710b22ace3672fa97bebe0",
-      "names": [],
-      "sources": []
-    },
-    {
-      "digest": "db874d463b0fdec77e9da1c4568f37cb70bd6596781eb93800db44fb8a116965",
       "names": [],
       "sources": []
     },
@@ -25709,11 +27917,6 @@
       "sources": []
     },
     {
-      "digest": "e2f9a41e0989f54ed8cee80f8db2bcf9d60a5c810dc9d45b83fa050b9dce7602",
-      "names": [],
-      "sources": []
-    },
-    {
       "digest": "e3056e0dda3a379e895386e368c3ce42131460ea65e410e1d091cca98a347305",
       "names": [
         "packages/jobs/jobs/src/types.ts#JobRegisteredData"
@@ -25751,6 +27954,15 @@
       "digest": "e438a9d4fb883b3e4a8d9fc8913aa1550ed50eb384bfbf943100a5605b537498",
       "names": [],
       "sources": []
+    },
+    {
+      "digest": "e4772e498f6618f25099f4febaa9c54a13145d2d0f708bc2185d11f5b5ae99e3",
+      "names": [
+        "packages/compaction/compaction/src/types.ts#CompactionPreparationPlan"
+      ],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:41"
+      ]
     },
     {
       "digest": "e481c46af3813e0010558e93f578b2986acd658404cec2d1679e3ac2a6c48654",
@@ -25824,6 +28036,11 @@
     },
     {
       "digest": "e95f957154b2b1b58692af53d4131180b6dd19e2264869f876dbaa959991494e",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "e9bf290e89fd4e44e20d8f278e1e115f3408fae45c91b1b693510bf6b8699b45",
       "names": [],
       "sources": []
     },
@@ -25902,6 +28119,11 @@
     },
     {
       "digest": "ef4f00923b9edbae15c7ef05320280bf61147ca17146cf59690359bfd5e5da45",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "efd52579f6a5f5f5ce0d8a3b5305a51263e857a8811e48494fb265c0b7ae8890",
       "names": [],
       "sources": []
     },
@@ -25990,6 +28212,18 @@
       ]
     },
     {
+      "digest": "f5455acb6a3df570bf2e42d7e02fc9340a074658abb1910cef86727e50546cea",
+      "names": [],
+      "sources": [
+        "packages/compaction/compaction/src/types.ts:229"
+      ]
+    },
+    {
+      "digest": "f5514ab9faf0347301b8709caf9c8b505b59091f66e843daa8613c4899c4bac0",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "f5520c1d261ca86ea03735799c311a0a9ede8babb588cf0a65422576d2ee0ad1",
       "names": [],
       "sources": []
@@ -26024,6 +28258,11 @@
       "sources": []
     },
     {
+      "digest": "f69e6d9da606ba697f23804026f98248add7a84860f88f19347b639bf4be81e9",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "f6afe41e3926f422fe849debe90819fddd739f0f59e20be9c71018b9554a7f09",
       "names": [],
       "sources": []
@@ -26046,6 +28285,11 @@
       "sources": [
         "packages/subagent/subagent/src/catalog.ts:28"
       ]
+    },
+    {
+      "digest": "f7849b2a519208cc2518372a384a6e71c8fc29e9fc67c23c257a33c9fa684aec",
+      "names": [],
+      "sources": []
     },
     {
       "digest": "f789af5ab844827eb5a4f357c0afae1eeed108c6c22d8ca1a56e586b349a7c85",
@@ -26102,6 +28346,11 @@
     },
     {
       "digest": "fab35c4520883c0d69e42d079c9f543fc5ac7a2d15b537b5572fcd99059c7018",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "fb0e966a8b0c86076a21a6f989c4f46b09d3c8c16f89a991c73f114cf36fb53c",
       "names": [],
       "sources": []
     },

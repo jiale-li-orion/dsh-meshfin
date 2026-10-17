@@ -48,7 +48,7 @@ kind: "package-reference"
 
 ### 实现后端
 
-继承提供的基类并实现三个操作：一个针对自动触发决定并执行压缩，一个按需压缩，一个压缩对话的显式范围。把你的类作为插件加载，它就会成为该组合的压缩服务。精确签名、失败规则以及每个后端必须生成的检查点标记，见下方实现章节与[压缩子系统参考](../../../docs/subsystems/compaction.zh.md)。
+继承提供的基类并实现五个操作：一个针对自动触发决定并执行压缩，一个按需压缩，一个压缩对话的显式范围，一个为已记录范围准备可审阅摘要而不改动对话，一个提交已审阅的预备结果。把你的类作为插件加载，它就会成为该组合的压缩服务。精确签名、失败规则以及每个后端必须生成的检查点标记，见下方实现章节与[压缩子系统参考](../../../docs/subsystems/compaction.zh.md)。
 
 ### 识别压缩后的历史
 
@@ -75,9 +75,15 @@ kind: "package-reference"
 
 ### 服务 API
 
-该约定是后端实现的三个抽象操作：`compactIfNeeded` 针对自动 `pressure` 或 `context-overflow` 触发，`compactNow` 进行一次显式按需缩减，`compactRegion` 针对调用方选择的表层范围。可复用的请求测量是独立服务 `ctx.tokenMeter`。穷尽式逐操作语义见[压缩子系统参考](../../../docs/subsystems/compaction.zh.md)；精确签名见 [`src/index.ts`](src/index.ts)。
+该约定是后端实现的五个抽象操作：`compactIfNeeded` 针对自动 `pressure` 或 `context-overflow` 触发，`compactNow` 进行一次显式按需缩减，`compactRegion` 针对调用方选择的表层范围，`prepareRegion` 为已记录范围准备可审阅摘要，`commitPrepared` 提交审阅结果。可复用的请求测量是独立服务 `ctx.tokenMeter`。穷尽式逐操作语义见[压缩子系统参考](../../../docs/subsystems/compaction.zh.md)；精确签名见 [`src/index.ts`](src/index.ts)。
 
-通过 `ctx.llm.stream()` 摘要的后端必须将 signal 转发到调用的 `GenerateOptions.signal`，因此 abort 或 fiber dispose（资源释放）会停止进行中的摘要。自动和显式范围标记对会从打开的轮次恢复其数字形式归属；手动标记对不要求存在打开的轮次，并标记 `turn: null`。
+`prepareRegion(request, agent, signal, onProgress)` 不向表层写入任何内容：它重新校验已记录的范围，为该路由计价出调用计划，并通过 `onProgress` 报告每个计划分块、每次调用尝试和每次完成的调用，好让调用方在审阅开始前把每一项都持久化。`commitPrepared(preparation, summary, source, admission, agent, signal)` 重新校验精确成员、摘要摘要值、工具配对和 token 价格，然后通过与其他入口相同的标记对提交审阅后的摘要——在空闲维护中，或调用方已打开的轮次内。
+
+通过 `ctx.llm.stream()` 摘要的后端必须将 signal 转发到调用的 `GenerateOptions.signal`，因此 abort 或 fiber dispose（资源释放）会停止进行中的摘要。自动和显式范围标记对会从打开的轮次恢复其数字形式归属；手动标记对与审阅后的空闲标记对不要求存在打开的轮次，并标记 `turn: null`。
+
+### 提供方解析
+
+每个 `CompactionEngine` 都在构造函数中向 `ctx.compactions` 注册，注册发生在注入的子 fiber 内，因此该贡献会随提供方一起释放。`CompactionDirectory.resolve(agent)` 返回为该确切 Agent 注册的提供方，否则返回进程 fallback；两者都不存在时抛出错误，因此调用方不会静默使用其他 Agent 的摘要器。`register(provider, agent)` 接受按 Agent 作用域的形式，供自行拥有提供方的组合使用；本代码树只注册进程 fallback，因为这里没有 Agent 作用域的消费者。
 
 ### 手动失败分类
 
@@ -88,7 +94,7 @@ kind: "package-reference"
 <a id="tool-pairing-boundaries"></a>
 ### 工具配对边界
 
-该 Service Definition 导出 `toolPairingBalancedBefore(session, seq)` 与 `toolPairingBalancedAfter(session, seq)`，用于对齐和验证压缩边界。安全边界不会被尚未回答的 assistant 工具调用跨越。每个 helper 都会验证给定事件 seq 位于当前表层，并根据按表层顺序缓存的各切分点配对状态返回结果，因此重复检查不读取事件；replace generation 会重建缓存，缺失 seq 或孤立的 `tool/result` 会被视为表层状态损坏并遭拒绝。
+该 Service Definition 导出 `toolPairingBalancedBefore(session, seq)` 与 `toolPairingBalancedAfter(session, seq)`，用于对齐和验证压缩边界，并导出 `toolPairingCutBalances(session)` 供需要一次取得当前表层全部切分点的调用方使用。安全边界不会被尚未回答的 assistant 工具调用跨越。每个 helper 都会验证给定事件 seq 位于当前表层，并根据按表层顺序缓存的各切分点配对状态返回结果，因此重复检查不读取事件；replace generation 会重建缓存，缺失 seq 或孤立的 `tool/result` 会被视为表层状态损坏并遭拒绝。N 个节点的表层有 N + 1 个切分点，因此 `toolPairingCutBalances` 的第 `i` 项是位置 `i` 之前的切分点，最后一项是尾部之后的切分点。
 
 ### 表层约定
 
@@ -102,9 +108,11 @@ kind: "package-reference"
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：抽象 `CompactionEngine`、`CompactionTrigger`、`ManualCompactionError`、`ctx.compaction` 合并 |
 | [`src/types.ts`](src/types.ts) | `CompactionResult` 与声明合并的 `compaction/*` 会话事件 |
-| [`src/tool-pairing.ts`](src/tool-pairing.ts) | 两个边界 helper 背后的每会话切分点平衡缓存 |
+| [`src/tool-pairing.ts`](src/tool-pairing.ts) | 两个边界 helper 与 `toolPairingCutBalances` 背后的每会话切分点平衡缓存 |
+| [`src/preparation.ts`](src/preparation.ts) | 生产者与消费者共享的、不依赖 Cordis 的预备摘要值 |
+| [`src/directory.ts`](src/directory.ts) | `CompactionDirectory`（`ctx.compactions`）：按 Agent 的提供方注册加进程 fallback（`./directory` 叶入口） |
 | [`src/checkpoint.ts`](src/checkpoint.ts) | 无 Cordis 依赖的检查点来源构造函数与谓词（`./checkpoint` 叶子） |
-| [`src/brand.ts`](src/brand.ts) | `CompactionId` 品牌化标识 |
+| [`src/brand.ts`](src/brand.ts) | `CompactionId` 与 `CompactionPreparationId` 品牌化标识 |
 
 ### 锁与串行化
 
@@ -113,6 +121,8 @@ kind: "package-reference"
 ### 事件
 
 `compaction/*` 事件通过 declaration merging 扩展 `SessionEventMap`（可合并扩展）——它们是会话事件，不是 Cordis `Events`，且都仅写入日志。生成的[持久化日志事件目录](../../../docs/persistence-catalog.zh.md)拥有每个事件的 payload；`compaction/prune` 记录了与工具结果修剪器共享的影子价格协议。
+
+`compaction/preparation/*` 事件独立于标记对记录审阅式范围工作：`requested`（所选范围、其摘要值与其路由价格）、`planned`（容量策略及其初始分块）、`attempted`（一次提供方调用的封装，在其流开始之前写入）、`call`（一次完成的调用，含其输出与用量）、`ready`（生成的摘要与分块计划）、`edited`（一次审阅编辑，其最新值即提交候选）、`failed`（任何表层变更之前的终结性预备失败）、`discarded`（被放弃且未触碰表层的已审阅预备）。之后的标记对通过 `preparationId` 指明它所提交的预备。
 
 </details>
 
@@ -156,7 +166,7 @@ kind: "package-reference"
 
 这些限制说明无论加载哪个后端，压缩都无法做到的事；它们是当前包约束。
 
-- **面向用户的命令，而非模型工具**——压缩由 `/compact` 命令与自动压力触发；不会注册面向模型的压缩工具。
+- **面向用户的命令，而非模型工具**——压缩由 `/compact` 命令与自动压力触发；不会注册面向模型的压缩工具。审阅式预备是后端与宿主 API（`prepareRegion`/`commitPrepared`），本代码树中没有任何随包插件用模型工具驱动它。
 - **部分单元溢出不在约定内**——平衡摘要压缩无法拆分一个不可分单元。当闭合工具对中可移除的主要部分是承载文本的工具结果时，可选剪枝配套服务仍可修复该工具对；无法压缩大型非工具节点，或不可剪枝剩余部分过大的工具单元。
 - **单独接近窗口大小的 envelope 不属于表层压缩工作**——压缩缩减派生历史，绝不缩减系统提示词、工具或会话前缀。
 

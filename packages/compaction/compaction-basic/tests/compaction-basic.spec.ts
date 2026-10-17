@@ -96,8 +96,15 @@ function agent(session: Session, model?: string): Agent {
   } as Agent
 }
 
+/** The replayed conversation messages of a prefix summarization input. */
+function prefixMessages(input: SummarizationInput): readonly Message[] {
+  if (input.kind === 'range') throw new Error('expected a replayed conversation prefix')
+  return input.messages
+}
+
 /** Flatten every text fragment the summarizer received across all messages. */
 function summarizedText(input: SummarizationInput): string {
+  if (input.kind === 'range') return input.document
   return input.messages.flatMap(message => message.content)
     .map(block => block.type === 'text' ? block.text : '')
     .join('\n')
@@ -319,6 +326,10 @@ describe('compact configuration and defaults', () => {
       maxTokens: 65_536,
       compactionRetries: 1,
       maxOverflowRetries: 1,
+      preparationOutputRatio: 0.25,
+      preparationMinOutputTokens: 16_000,
+      preparationMaxOutputTokens: 128_000,
+      preparationConcurrency: 2,
       modelPolicies: [],
       auto: true,
     })
@@ -506,6 +517,20 @@ describe('compact configuration and defaults', () => {
   it('validates common values and pressure-policy invariants', () => {
     const bad = [
       [{ maxTokens: 0 }, /maxTokens/],
+      [{ preparationOutputRatio: 0 }, /preparationOutputRatio/],
+      [{ preparationOutputRatio: 1.1 }, /preparationOutputRatio/],
+      [{ preparationMinOutputTokens: 0 }, /preparationMinOutputTokens/],
+      [{ preparationMaxOutputTokens: 0 }, /preparationMaxOutputTokens/],
+      [{ preparationConcurrency: 0 }, /preparationConcurrency/],
+      [{ preparationMinOutputTokens: 33, preparationMaxOutputTokens: 32 }, /must not exceed/],
+      [{
+        modelPolicies: [{
+          provider: MODEL,
+          model: MODEL,
+          preparationMinOutputTokens: 33,
+          preparationMaxOutputTokens: 32,
+        }],
+      }, /modelPolicies\[0\]: preparationMinOutputTokens \(33\) must not exceed/],
       [{ headroomTokens: -1 }, /headroomTokens.*non-negative integer/],
       [{ headroomTokens: 0.5 }, /headroomTokens.*non-negative integer/],
       [{ headroomTokens: '65536' }, /headroomTokens.*non-negative integer/],
@@ -556,6 +581,7 @@ describe('compact configuration and defaults', () => {
       [{ modelPolicies: [{ provider: MODEL, model: MODEL }, { provider: MODEL, model: MODEL }] }, /duplicate model policy/],
       [{ models: { [MODEL]: { retainTokens: 10 } } }, /BasicCompactionConfig: unknown key "models"/],
       [{ thresholdRato: 0.5 }, /BasicCompactionConfig: unknown key "thresholdRato"/],
+      [{ preparationChunkTokens: 48_000 }, /BasicCompactionConfig: unknown key "preparationChunkTokens"/],
     ] as Array<[unknown, RegExp]>
 
     for (const [config, pattern] of bad) {
@@ -777,8 +803,8 @@ describe('pressure measurement and retention', () => {
       role: 'system',
       content: [{ type: 'text', text: 'SYSTEM HEAD' }],
     })
-    expect(compact.calls[0]!.input.messages[0]).toEqual(session.deriveMessages()[0])
-    expect(compact.calls[0]!.input.messages.filter(message => message.role === 'system')).toHaveLength(1)
+    expect(prefixMessages(compact.calls[0]!.input)[0]).toEqual(session.deriveMessages()[0])
+    expect(prefixMessages(compact.calls[0]!.input).filter(message => message.role === 'system')).toHaveLength(1)
   })
 
   it('declines when only the system head precedes the retained tail', () => {
@@ -1085,15 +1111,15 @@ describe('compaction region transaction', () => {
     const emptyNodes = emptyHead.surface.nodes
     expect(emptyHead.eventAt(emptyNodes[0]!)?.type).toBe('system/message')
     await compact.compactRegion(emptyNodes[1]!, emptyNodes[2]!, agent(emptyHead, MODEL), SIGNAL)
-    expect(compact.calls[0]!.input.messages[0]).toMatchObject({ role: 'user' })
-    expect(compact.calls[0]!.input.messages.some(message => message.role === 'system')).toBe(false)
+    expect(prefixMessages(compact.calls[0]!.input)[0]).toMatchObject({ role: 'user' })
+    expect(prefixMessages(compact.calls[0]!.input).some(message => message.role === 'system')).toBe(false)
     expect(emptyHead.surface.nodes[0]).toBe(emptyNodes[0])
 
     const headless = conversation(3)
     const nodes = headless.surface.nodes
     await compact.compactRegion(nodes[0]!, nodes[1]!, agent(headless, MODEL), SIGNAL)
-    expect(compact.calls[1]!.input.messages.some(message => message.role === 'system')).toBe(false)
-    expect(compact.calls[1]!.input.messages[0]).toMatchObject({ role: 'user' })
+    expect(prefixMessages(compact.calls[1]!.input).some(message => message.role === 'system')).toBe(false)
+    expect(prefixMessages(compact.calls[1]!.input)[0]).toMatchObject({ role: 'user' })
   })
 
   it('surfaces the session rejection of a range that covers the system head', async () => {

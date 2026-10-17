@@ -5,14 +5,15 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { contentHasImage, BlockAssembler, LlmError } from '@deepseek-ai/dsh-llm'
+import { contentHasImage, createUserMessage, BlockAssembler, LlmError } from '@deepseek-ai/dsh-llm'
 import { deepFreeze } from '@deepseek-ai/dsh-util-values'
 import type {
   ContentBlock, FinishReason, GenerateOptions, Message, RequestMessage, TokenUsage, ToolSchema,
 } from '@deepseek-ai/dsh-llm'
 import type { Agent } from '@deepseek-ai/dsh-agent'
 
-interface SummaryConfig {
+/** Resolved policy fields needed to choose and cap one summarization call. */
+export interface SummaryConfig {
   readonly summarizationProvider: string
   readonly summarizationModel: string
   readonly maxTokens: number
@@ -68,7 +69,7 @@ const COMPACTION_INSTRUCTION = [
 
 /** Framing that makes the replacement user message established context. */
 const CHECKPOINT_PREAMBLE =
-  'This is an automatically generated checkpoint condensing an earlier span of the conversation to free up context. Treat the captured context as established background and build on it without restating it. Continue the task directly from the messages that follow, without acknowledging this checkpoint.'
+  'This is an automatically generated checkpoint condensing an earlier span of the conversation to free up context. Treat the captured context as established background and build on it without restating it. Later context wins if it conflicts with this checkpoint. Continue the task directly from the messages that follow, without acknowledging this checkpoint.'
 
 /**
  * The replayed conversation surface the summarizer condenses. Reproducing the
@@ -76,11 +77,40 @@ const CHECKPOINT_PREAMBLE =
  * lets the auxiliary call reuse the provider's warm prefix cache; the trailing
  * compaction instruction is then the only novel input.
  */
-export interface SummarizationInput {
+export interface PrefixSummarizationInput {
+  /** Discriminator selecting the cache-reusing conversation-prefix strategy. */
+  readonly kind?: 'prefix'
   /** The conversation's tool schemas, reused for prefix-cache alignment; absent when the request carried none. */
   readonly tools?: readonly ToolSchema[]
   /** The derived system head, when present, followed by the shadowed region in surface order. */
   readonly messages: readonly Message[]
+}
+
+/** Position-local canonical document used by reviewed range compaction. */
+export interface RangeSummarizationInput {
+  /** Discriminator selecting the position-local reviewed-range strategy. */
+  readonly kind: 'range'
+  /** Direct, map, or reduce stage this document belongs to. */
+  readonly stage: 'direct' | 'map' | 'reduce'
+  /** The exact rendered document to summarize. */
+  readonly document: string
+  /** Caller-supplied facts the summary must preserve. */
+  readonly preservationBrief?: string
+}
+
+/** One prefix-cache or position-local summarization input. */
+export type SummarizationInput = PrefixSummarizationInput | RangeSummarizationInput
+
+/**
+ * Build the exact position-local user message used for a reviewed range call.
+ * @param input - direct, map, or reduce document and preservation brief.
+ * @returns one detached model message suitable for pricing or dispatch.
+ */
+export function rangeSummarizationMessage(input: RangeSummarizationInput): Message {
+  return createUserMessage({
+    content: [{ type: 'text', text: rangeInstruction(input) }],
+    source: { kind: 'user' },
+  })
 }
 
 /** Safe summary content plus the exact auxiliary call envelope recorded with it. */
@@ -106,24 +136,25 @@ export type SummaryResult = {
   }
 )
 
+/** Exact provider/model route used by one summarization call. */
+export interface SummarizationTarget {
+  /** Registered provider route the call uses. */
+  readonly provider: string
+  /** Exact routed model id the call uses. */
+  readonly model: string
+}
+
 /**
- * Run the default cache-reusing `ctx.llm.stream()` summarization call: replay
- * the conversation prefix, then append the compaction instruction as the final
- * user message so the provider's warm prefix cache is reused.
- * @param ctx - context providing the LLM service.
- * @param config - resolved backend configuration.
- * @param input - replayed conversation prefix (system, tools, and leading messages) to condense.
- * @param agent - supplies routed-model history, fallback model, and session id.
- * @param signal - optional cancellation forwarded to the adapter.
- * @returns safe text-only summary blocks and the exact call envelope and output.
+ * Resolve the configured, latest routed, or Agent fallback summarization target.
+ * @param config - resolved compaction policy.
+ * @param agent - supplies the latest durable route and fallback options.
+ * @returns the exact provider/model route.
+ * @throws when no complete route is available.
  */
-export async function summarizeWithLlm(
-  ctx: Context,
+export function resolveSummarizationTarget(
   config: SummaryConfig,
-  input: SummarizationInput,
   agent: Agent,
-  signal?: AbortSignal,
-): Promise<SummaryResult> {
+): SummarizationTarget {
   const latest = agent.session.requestHeader()?.config
   const configured = config.summarizationProvider.length === 0
     ? undefined
@@ -140,22 +171,49 @@ export async function summarizeWithLlm(
       'no provider/model available for summarization: set both BasicCompactionConfig summarization fields, route one request, or set both AgentOptions fields',
     )
   }
+  return { provider: target.provider, model: target.model }
+}
+
+/**
+ * Run the default cache-reusing `ctx.llm.stream()` summarization call: replay
+ * the conversation prefix, then append the compaction instruction as the final
+ * user message so the provider's warm prefix cache is reused.
+ * @param ctx - context providing the LLM service.
+ * @param config - resolved backend configuration.
+ * @param input - replayed conversation prefix or one position-local range document to condense.
+ * @param agent - supplies routed-model history, fallback model, and session id.
+ * @param signal - optional cancellation forwarded to the adapter.
+ * @param maxTokens - operation-specific output cap; the policy cap is the default.
+ * @returns safe text-only summary blocks and the exact call envelope and output.
+ */
+export async function summarizeWithLlm(
+  ctx: Context,
+  config: SummaryConfig,
+  input: SummarizationInput,
+  agent: Agent,
+  signal?: AbortSignal,
+  maxTokens: number = config.maxTokens,
+): Promise<SummaryResult> {
+  const target = resolveSummarizationTarget(config, agent)
 
   const assembler = new BlockAssembler()
-  const messages: RequestMessage[] = [
-    ...input.messages,
-    deepFreeze({
-      role: 'user',
-      content: [{ type: 'text', text: COMPACTION_INSTRUCTION }],
-    }),
-  ]
+  const range = input.kind === 'range'
+  const messages: RequestMessage[] = range
+    ? [rangeSummarizationMessage(input)]
+    : [
+      ...input.messages,
+      deepFreeze({
+        role: 'user',
+        content: [{ type: 'text', text: COMPACTION_INSTRUCTION }],
+      }),
+    ]
   const options: GenerateOptions = {
     provider: target.provider,
     model: target.model,
     messages,
     toolHistory: agent.session.toolHistory(),
-    ...input.tools === undefined ? {} : { tools: [...input.tools] },
-    maxTokens: config.maxTokens,
+    ...range || input.tools === undefined ? {} : { tools: [...input.tools] },
+    maxTokens,
     sessionId: agent.session.id,
     purpose: 'compaction',
     ...signal === undefined ? {} : { signal },
@@ -175,9 +233,42 @@ export async function summarizeWithLlm(
     llmStreamCall: true,
     provider: options.provider,
     model: options.model,
-    maxTokens: config.maxTokens,
+    maxTokens,
     ...(assembler.usage === undefined ? {} : { usage: assembler.usage }),
   }
+}
+
+/** Position-local map/reduce directive that never invents global current-work state. */
+function rangeInstruction(input: RangeSummarizationInput): string {
+  const task = input.stage === 'reduce'
+    ? 'Merge the partial summaries below into one checkpoint.'
+    : input.stage === 'direct'
+      ? 'Summarize the complete selected context below into one checkpoint.'
+      : 'Summarize the selected context fragment below.'
+  return [
+    'You are a context compaction engine for an AI coding assistant.',
+    task,
+    'The result replaces only this position in a larger conversation. Do not infer the global current task or next action.',
+    'Output exactly these Markdown sections in order. Use concise bullets and write "(none)" for an empty section.',
+    '',
+    '## Outcomes',
+    '## Decisions and Constraints',
+    '## Artifacts and State Changes',
+    '## Commands, Errors, and Results',
+    '## Background Facts Still in Force',
+    '## Open Threads Originating Here',
+    '## Literal Anchors',
+    '',
+    'Preserve exact paths, commands, identifiers, error strings, numeric values, signatures, and syntax fragments when they may be needed later.',
+    'Do not mention this summarization request or the compaction mechanism. Output only the checkpoint Markdown.',
+    input.preservationBrief === undefined || input.preservationBrief.trim() === ''
+      ? 'Additional preservation brief: (none)'
+      : `Additional preservation brief: ${input.preservationBrief}`,
+    '',
+    '<selected-context>',
+    input.document,
+    '</selected-context>',
+  ].join('\n')
 }
 
 /**

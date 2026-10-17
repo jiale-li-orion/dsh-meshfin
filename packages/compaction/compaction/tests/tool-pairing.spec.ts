@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createUserMessage, ToolCallId , createMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
 import type { ContextFormed } from '@deepseek-ai/dsh-llm'
-import { CompactionId, compactCheckpointSource, toolPairingBalancedAfter, toolPairingBalancedBefore } from '@deepseek-ai/dsh-compaction'
+import { CompactionId, compactCheckpointSource, toolPairingBalancedAfter, toolPairingBalancedBefore, toolPairingCutBalances } from '@deepseek-ai/dsh-compaction'
 import { Session, SessionId, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { SessionEvent, SessionSeq as SessionSeqType } from '@deepseek-ai/dsh-session'
 
@@ -208,6 +208,20 @@ describe('tool-pairing surface identity', () => {
       source: { kind: 'user' },
     }), SURFACE)
     expect(toolPairingBalancedAfter(session, session.surface.nodes[0]!)).toBe(true)
+  })
+
+  it('exposes one balance per surface cut, including both ends', () => {
+    const session = closedToolStep()
+    const nodes = session.surface.nodes
+    const balances = toolPairingCutBalances(session)
+    expect(balances).toHaveLength(nodes.length + 1)
+    // A surface of N nodes has N + 1 cuts; the fold starts and ends balanced.
+    expect(balances[0]).toBe(true)
+    expect(balances.at(-1)).toBe(true)
+    nodes.forEach((seq, index) => {
+      expect(balances[index]).toBe(toolPairingBalancedBefore(session, seq))
+      expect(balances[index + 1]).toBe(toolPairingBalancedAfter(session, seq))
+    })
   })
 })
 

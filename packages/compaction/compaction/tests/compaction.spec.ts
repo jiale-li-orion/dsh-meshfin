@@ -92,6 +92,14 @@ class StubCompactionEngine extends CompactionEngine {
       shadowedTokenCount: 0,
     }
   }
+
+  override prepareRegion(): Promise<never> {
+    return Promise.reject(new Error('stub preparation is not configured'))
+  }
+
+  override commitPrepared(): Promise<never> {
+    return Promise.reject(new Error('stub prepared commit is not configured'))
+  }
 }
 
 describe('CompactionEngine seam', () => {

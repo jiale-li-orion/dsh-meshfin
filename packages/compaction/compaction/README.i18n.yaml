@@ -27,8 +27,8 @@
   en: 8213b79c776f1a75
   zh: 481c0dffd342426a
 /deepseek-ai-dsh-compaction/use-this-package/implementing-a-backend:
-  en: 280b5fda4c9b9c8b
-  zh: 764ca79fccf98279
+  en: b8bddaf11dcd134f
+  zh: 4e354fff9b72aca4
 /deepseek-ai-dsh-compaction/use-this-package/recognizing-condensed-history:
   en: 35502487f2850f05
   zh: 333d2b86cc1d6eb0
@@ -39,26 +39,29 @@
   en: 226e05fde1f7ad54
   zh: 4b0f671d68aee872
 /deepseek-ai-dsh-compaction/understand-the-implementation/service-api:
-  en: d742d41c7eb5d406
-  zh: 6ff26c23eba5dd59
+  en: a10862bd9d1d2167
+  zh: 8053083149926c83
+/deepseek-ai-dsh-compaction/understand-the-implementation/provider-resolution:
+  en: 96f3dd304183ec6b
+  zh: 503e441815375f54
 /deepseek-ai-dsh-compaction/understand-the-implementation/manual-failure-taxonomy:
   en: 81449c88ba52f445
   zh: 2cdcce236bfbf284
 /deepseek-ai-dsh-compaction/understand-the-implementation/tool-pairing-boundaries:
-  en: 15dad68a04d6c86b
-  zh: 3b95acf1b7e503bf
+  en: e614edf733ad51e6
+  zh: 99d6b6772118ef4e
 /deepseek-ai-dsh-compaction/understand-the-implementation/the-surface-contract:
   en: 28980d8259e59700
   zh: c452e0bb4b778824
 /deepseek-ai-dsh-compaction/understand-the-implementation/source-map:
-  en: 076448ecc9911baf
-  zh: 1b671f96fb217d5e
+  en: 3eae35ef5d520108
+  zh: 635417fdea953b9c
 /deepseek-ai-dsh-compaction/understand-the-implementation/locking-and-serialization:
   en: 68caa51bed28bada
   zh: 3f8261f9dcba95ed
 /deepseek-ai-dsh-compaction/understand-the-implementation/events:
-  en: dc5faf71b27cc340
-  zh: 065f8339009c1a3a
+  en: 7db278445927643c
+  zh: 5972df00d3197979
 /deepseek-ai-dsh-compaction/further-exploration:
   en: b12341c6424d7960
   zh: 09fe5b30a599146f
@@ -78,8 +81,8 @@
   en: 40ba838a2309c44a
   zh: c609fc1587a0d666
 /deepseek-ai-dsh-compaction/known-limitations-and-deferred-work:
-  en: fee9ba06d3e5f35c
-  zh: 2bb5241e2447d15d
+  en: 68c57f380cc11cfe
+  zh: e669858c4b26b217
 /deepseek-ai-dsh-compaction/known-limitations-and-deferred-work/dev-note:
   en: 270e23ae6414aff0
   zh: c6d219b8a547dbca

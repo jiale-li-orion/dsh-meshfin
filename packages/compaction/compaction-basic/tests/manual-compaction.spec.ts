@@ -253,7 +253,9 @@ describe('compactNow through the real loop', () => {
       const source = agent.session.snapshotEvents().find(event => event.type === 'user/message')!
       agent.session.append('image/offload', { targets: [{ seq: source.seq, imageIndexes: [0] }] })
       expect(await compact.compactNow(agent, SIGNAL)).not.toBeNull()
-      const image = compact.calls[0]?.messages.flatMap(message => message.content).find(block => block.type === 'image')
+      const prefix = compact.calls[0]!
+      if (prefix.kind === 'range') throw new Error('expected a replayed conversation prefix')
+      const image = prefix.messages.flatMap(message => message.content).find(block => block.type === 'image')
       expect(image).toMatchObject({ offloaded: true })
       expect(JSON.stringify(source)).not.toContain('offloaded')
     } finally {

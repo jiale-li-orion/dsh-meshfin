@@ -22,6 +22,18 @@ const DEFAULT_THRESHOLD_RATIO = 0.8
 /** Default verbatim-tail fraction for every routed model. */
 const DEFAULT_RETAIN_RATIO = 0.16
 
+/** Default selected-input fraction used as a reviewed range's output target. */
+const DEFAULT_PREPARATION_OUTPUT_RATIO = 0.25
+
+/** Default lower bound for a reviewed range's output target. */
+const DEFAULT_PREPARATION_MIN_OUTPUT_TOKENS = 16_000
+
+/** Default upper bound for a reviewed range's output target. */
+const DEFAULT_PREPARATION_MAX_OUTPUT_TOKENS = 128_000
+
+/** Default maximum concurrently active reviewed-range provider calls. */
+const DEFAULT_PREPARATION_CONCURRENCY = 2
+
 /** Fields shared by top-level defaults and exact-target overrides. */
 const POLICY_CONFIG_KEYS = [
   'thresholdRatio',
@@ -33,6 +45,10 @@ const POLICY_CONFIG_KEYS = [
   'maxTokens',
   'compactionRetries',
   'maxOverflowRetries',
+  'preparationOutputRatio',
+  'preparationMinOutputTokens',
+  'preparationMaxOutputTokens',
+  'preparationConcurrency',
 ] as const
 
 /** Complete public top-level configuration key set. */
@@ -79,6 +95,14 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
   const retention = resolveRetention(config, { retainRatio: DEFAULT_RETAIN_RATIO })
   validateRatioRetention(thresholdRatio, retention, 'BasicCompactionConfig')
   const modelPolicies = resolveModelPolicies(config.modelPolicies)
+  const preparationOutputRatio = config.preparationOutputRatio ?? DEFAULT_PREPARATION_OUTPUT_RATIO
+  const preparationMinOutputTokens = config.preparationMinOutputTokens ?? DEFAULT_PREPARATION_MIN_OUTPUT_TOKENS
+  const preparationMaxOutputTokens = config.preparationMaxOutputTokens ?? DEFAULT_PREPARATION_MAX_OUTPUT_TOKENS
+  validatePreparationOutputRange(
+    preparationMinOutputTokens,
+    preparationMaxOutputTokens,
+    'BasicCompactionConfig',
+  )
   for (const [index, policy] of modelPolicies.entries()) {
     if (policy.maxTokens === undefined && config.maxTokens === undefined
       && policy.headroomTokens !== undefined) {
@@ -93,6 +117,11 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
       resolveRetention(policy, retention),
       `BasicCompactionConfig: modelPolicies[${index}]`,
     )
+    validatePreparationOutputRange(
+      policy.preparationMinOutputTokens ?? preparationMinOutputTokens,
+      policy.preparationMaxOutputTokens ?? preparationMaxOutputTokens,
+      `BasicCompactionConfig: modelPolicies[${index}]`,
+    )
   }
 
   return deepFreeze({
@@ -104,9 +133,23 @@ export function resolveConfig(config: BasicCompactionConfig = {}): ResolvedConfi
     maxTokens,
     compactionRetries: config.compactionRetries ?? 1,
     maxOverflowRetries: config.maxOverflowRetries ?? 1,
+    preparationOutputRatio,
+    preparationMinOutputTokens,
+    preparationMaxOutputTokens,
+    preparationConcurrency: config.preparationConcurrency ?? DEFAULT_PREPARATION_CONCURRENCY,
     modelPolicies,
     auto: config.auto ?? true,
   })
+}
+
+/** Ensure the default reviewed-range output interval is ordered. */
+function validatePreparationOutputRange(minimum: number, maximum: number, name: string): void {
+  if (minimum > maximum) {
+    throw new Error(
+      `${name}: preparationMinOutputTokens (${minimum}) must not exceed `
+      + `preparationMaxOutputTokens (${maximum})`,
+    )
+  }
 }
 
 /**
@@ -135,6 +178,10 @@ export function resolveTargetPolicy(
     maxTokens: override?.maxTokens ?? config.maxTokens,
     compactionRetries: override?.compactionRetries ?? config.compactionRetries,
     maxOverflowRetries: override?.maxOverflowRetries ?? config.maxOverflowRetries,
+    preparationOutputRatio: override?.preparationOutputRatio ?? config.preparationOutputRatio,
+    preparationMinOutputTokens: override?.preparationMinOutputTokens ?? config.preparationMinOutputTokens,
+    preparationMaxOutputTokens: override?.preparationMaxOutputTokens ?? config.preparationMaxOutputTokens,
+    preparationConcurrency: override?.preparationConcurrency ?? config.preparationConcurrency,
   })
 }
 
@@ -213,6 +260,10 @@ export function resolveCompactSpec(
     maxTokens: policy.maxTokens,
     compactionRetries: policy.compactionRetries,
     maxOverflowRetries: policy.maxOverflowRetries,
+    preparationOutputRatio: policy.preparationOutputRatio,
+    preparationMinOutputTokens: policy.preparationMinOutputTokens,
+    preparationMaxOutputTokens: policy.preparationMaxOutputTokens,
+    preparationConcurrency: policy.preparationConcurrency,
   })
 }
 
@@ -285,6 +336,10 @@ function validatePolicy(
   const maxTokens = config.maxTokens
   const compactionRetries = config.compactionRetries
   const maxOverflowRetries = config.maxOverflowRetries
+  const preparationOutputRatio = config.preparationOutputRatio
+  const preparationMinOutputTokens = config.preparationMinOutputTokens
+  const preparationMaxOutputTokens = config.preparationMaxOutputTokens
+  const preparationConcurrency = config.preparationConcurrency
   if (thresholdRatio !== undefined) assertRatio(`${name}.thresholdRatio`, thresholdRatio)
   if (headroomTokens !== undefined) assertNonNegativeInteger(`${name}.headroomTokens`, headroomTokens)
   if (retainRatio !== undefined) assertRatio(`${name}.retainRatio`, retainRatio)
@@ -298,6 +353,16 @@ function validatePolicy(
   }
   if (maxOverflowRetries !== undefined) {
     assertNonNegativeInteger(`${name}.maxOverflowRetries`, maxOverflowRetries)
+  }
+  if (preparationOutputRatio !== undefined) assertRatio(`${name}.preparationOutputRatio`, preparationOutputRatio)
+  if (preparationMinOutputTokens !== undefined) {
+    assertPositiveInteger(`${name}.preparationMinOutputTokens`, preparationMinOutputTokens)
+  }
+  if (preparationMaxOutputTokens !== undefined) {
+    assertPositiveInteger(`${name}.preparationMaxOutputTokens`, preparationMaxOutputTokens)
+  }
+  if (preparationConcurrency !== undefined) {
+    assertPositiveInteger(`${name}.preparationConcurrency`, preparationConcurrency)
   }
 
   validateSummarizationPair(config, name)

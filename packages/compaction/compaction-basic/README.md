@@ -72,6 +72,10 @@ All settings are optional. With context window `W`, effective request output cap
 | `maxTokens` | `headroomTokens` (`65536`) | Positive summary output cap, including any provider-counted reasoning tokens. Explicit per-model caps override explicit global caps; otherwise the cap follows the resolved headroom. |
 | `compactionRetries` | `1` | Extra condensation attempts after the first when pressure remains above threshold. |
 | `maxOverflowRetries` | `1` | Maximum retries after a confirmed context-window overflow; `0` disables recovery only. |
+| `preparationOutputRatio` | `0.25` | Selected-input fraction used as a reviewed range's default output target. |
+| `preparationMinOutputTokens` | `16000` | Lower bound on that output target before model and context caps; must not exceed `preparationMaxOutputTokens`. |
+| `preparationMaxOutputTokens` | `128000` | Upper bound on that output target before model and context caps. |
+| `preparationConcurrency` | `2` | Maximum concurrently active provider calls during a reviewed range preparation. |
 | `modelPolicies` | `[]` | Exact `{ provider, model, ...partialPolicy }` overrides for individual model routes. |
 | `auto` | `true` | Enable automatic condensation and overflow recovery; set `false` for manual-only operation. |
 
@@ -106,7 +110,8 @@ The backend is built on four commitments:
 - **One measurement service prices every decision.** The singleton `ctx.tokenMeter` measures the latest canonical logged envelope and current surface at one consumed-log revision. When the routed adapter declares request-image pricing, the meter applies it to image history. Pressure, recent-tail retention, range selection, and shrink validation use the same route-priced node figures; logged replacement shadow prices stay on the route-independent heuristic so pure projection folds remain consistent.
 - **The log-recorded bracket is the transaction.** All entry points share one bracket-first region transaction: validate the range and live lock, append `compaction/start` synchronously, prepare and await the summary, revalidate, append `compaction/summary` plus the replacement, and make exactly one closing attempt. Automatic and explicit-region calls require a numeric open-turn owner and whole-surface stability; `compactNow()` reserves idle admission, uses `turn: null`, accepts append-only context outside its selected span, flushes every closed attempt, and releases admission in `finally`.
 - **Summarization reuses the provider's warm prefix.** Replaying the system prompt held by the `system/message` at surface node 0, the last routed request's tools, and the shadowed-region messages byte-for-byte makes the auxiliary call a genuine prefix of the conversation, so only the trailing instruction and the summary output are uncached.
-- **`summarize()` is the sole subclass hook.** A template- or remote-summarizer subclass can override it while pressure, retention, cited source events, shrink validation, and shadowed-token accounting stay on the token meter.
+- **`summarize()` is the provider hook.** A template- or remote-summarizer subclass overrides it, and `resolvePreparationTarget()` when it does not use `ctx.llm` model metadata, while pressure, retention, cited source events, shrink validation, and shadowed-token accounting stay on the token meter.
+- **Reviewed preparation is a separate phase.** A caller records the selected span, then `prepareRegion` plans against exact model capacity, records every chunk and call, and returns a summary without touching the surface; `commitPrepared` revalidates and commits it through the same bracket.
 
 ### Automatic triggers and overflow recovery
 
@@ -134,7 +139,8 @@ The transaction validates the surface span and the durable lock, appends `compac
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: `BasicCompactionEngine`, automatic listeners, entry-point dispatch |
 | [`src/region.ts`](src/region.ts) | Retention selection and the shared bracket-first compaction transaction |
-| [`src/summarizer.ts`](src/summarizer.ts) | Default `ctx.llm.stream()` summarization, checkpoint framing, safe-summary projection |
+| [`src/preparation.ts`](src/preparation.ts) | Reviewed range planning: capacity strategy, deterministic chunks, map/reduce rounds, durable call facts |
+| [`src/summarizer.ts`](src/summarizer.ts) | Default `ctx.llm.stream()` summarization, position-local range instructions, checkpoint framing, safe-summary projection |
 | [`src/config.ts`](src/config.ts) | Load-time validation and routed-model policy resolution |
 | [`src/types.ts`](src/types.ts) | `BasicCompactionConfig` and resolved policy vocabulary |
 
@@ -168,7 +174,7 @@ After a successful step crosses the threshold, oversized tool results are first 
 ##### Conversation checkpoint preamble
 
 ```markdown
-This is an automatically generated checkpoint condensing an earlier span of the conversation to free up context. Treat the captured context as established background and build on it without restating it. Continue the task directly from the messages that follow, without acknowledging this checkpoint.
+This is an automatically generated checkpoint condensing an earlier span of the conversation to free up context. Treat the captured context as established background and build on it without restating it. Later context wins if it conflicts with this checkpoint. Continue the task directly from the messages that follow, without acknowledging this checkpoint.
 ```
 
 #### Token effect
@@ -179,7 +185,7 @@ Model-free pruning can avoid the auxiliary call entirely; otherwise it reduces t
 
 Replacing rather than append-only. Each checkpoint invalidates reuse from the first replaced history token; the unchanged request prefix before that range remains reusable.
 
-### Auxiliary summarizer request
+### Automatic and `/compact` summarizer request
 
 #### What the model sees
 
@@ -232,6 +238,20 @@ This is a separate model call: the replayed conversation prefix plus the fixed i
 
 The replayed system prompt, tools, and shadowed-region messages match the conversation's last routed request byte-for-byte, so the provider's warm prefix cache is reused up to the trailing instruction; only that instruction, and the summary output, is uncached. Routing the summarizer to a different provider/model, or compacting a non-head range, forgoes this reuse.
 
+### Reviewed range preparation request
+
+#### What the model sees
+
+A reviewed range is summarized position-locally, so a middle range costs nothing proportional to the unrelated retained history. The selected span is rendered into one canonical document of tool-balanced `<context-unit>` blocks, each holding `<message>` elements and their blocks. The complete document goes to one `direct` call whenever its instruction, input, and output cap fit the model's window; otherwise it forms capacity-derived `map` chunks and the partial summaries are merged by `reduce` rounds. Every call uses the same fixed instruction: it names the seven sections `Outcomes`, `Decisions and Constraints`, `Artifacts and State Changes`, `Commands, Errors, and Results`, `Background Facts Still in Force`, `Open Threads Originating Here`, and `Literal Anchors`, states that the result replaces only this position and must not infer global current work, and appends the caller's optional preservation brief.
+
+#### Token effect
+
+The default output target is `min(preparationMaxOutputTokens, max(preparationMinOutputTokens, ceil(selectedTokens × preparationOutputRatio)))`, capped further by the route's declared per-request output cap. Preparation adds no conversation message and changes no surface: the cost is the summarization calls alone, bounded by `preparationConcurrency` concurrent calls per round. A map/reduce round caps one output at a quarter of the window, so the remaining capacity always admits another round.
+
+#### KV Cache effect
+
+Range calls are independent position-local requests and do not promise reuse of the conversation prefix. A later commit preserves the conversation prefix before the selected range and invalidates it from that position.
+
 ## Known Limitations and Deferred Work
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -243,7 +263,9 @@ These limits define when automatic condensation is a poor fit or needs special c
 - **Overflow classification is adapter-maintained** — provider wording can change; both DeepSeek adapters normalize recognized context-limit failures to `CONTEXT_WINDOW_EXCEEDED`.
 - **Some indivisible-unit and envelope-only overflow remains outside surface compaction** — recovery cannot shrink system/tools/prefix, split an indivisible non-tool node, or repair a tool unit whose non-prunable remainder still exceeds the window. The optional pruner can shrink text-bearing tool-result bulk inside an otherwise indivisible pair.
 - **`compactRegion` requires an open turn** — a manual call on a fully-closed session throws ("no open turn") rather than compacting.
-- **Summarization failure preserves the latest durable surface** — before any replacement, the auto path logs a warning and proceeds with full over-budget history. If pruning already landed, a later summarization failure proceeds from that durable pruned surface. Summarization truncation at `maxTokens`, which hidden reasoning tokens can consume, follows the same rule.
+- **Summarization failure preserves the latest durable surface** — before any replacement, the auto path logs a warning and proceeds with full over-budget history. If pruning already landed, a later summarization failure proceeds from that durable pruned surface. Summarization truncation at `maxTokens`, or at a reviewed preparation's effective output cap, which hidden reasoning tokens can consume, follows the same rule.
+- **Reviewed preparation has no shipped driver** — `prepareRegion` and `commitPrepared` are complete backend operations, but no plugin in this tree exposes them to a model tool or a human command; a caller records the preparation events and review edits itself.
+- **A reviewed range is priced whole** — preparation and commit each read one full-surface measurement through `ctx.tokenMeter`; there is no narrower position-local measurement API to call.
 
 <a id="dev-note"></a>
 ### Dev Note

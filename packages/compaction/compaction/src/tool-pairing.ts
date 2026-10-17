@@ -124,3 +124,13 @@ export function toolPairingBalancedBefore(session: Session, seq: SessionSeq): bo
 export function toolPairingBalancedAfter(session: Session, seq: SessionSeq): boolean {
   return cutBalance(balanceCache(session), seq, 1)
 }
+
+/**
+ * Balance of every cut in current surface order. A surface with N nodes has
+ * N + 1 entries: index 0 is before the first node and index N is after the tail.
+ * @param session - Session whose current surface is folded.
+ * @returns cached readonly cut balances for this surface generation and append tail.
+ */
+export function toolPairingCutBalances(session: Session): readonly boolean[] {
+  return balanceCache(session).cutBalanced
+}

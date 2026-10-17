@@ -26,6 +26,14 @@ export interface CompactionPolicyConfig {
   compactionRetries?: number
   /** Maximum retries after canonical context overflow; `0` disables recovery. Defaults to `1`. */
   maxOverflowRetries?: number
+  /** Selected-input fraction used for a reviewed range's output budget. Defaults to `0.25`. */
+  preparationOutputRatio?: number
+  /** Minimum reviewed-range output budget before model and context caps. Defaults to `16000`. */
+  preparationMinOutputTokens?: number
+  /** Maximum reviewed-range output budget before model and context caps. Defaults to `128000`. */
+  preparationMaxOutputTokens?: number
+  /** Maximum concurrent range-preparation provider calls. Defaults to `2`. */
+  preparationConcurrency?: number
 }
 
 /** Exact provider/model override merged over the default compaction policy. */
@@ -58,6 +66,10 @@ interface ResolvedPolicyFields {
   readonly maxTokens: number
   readonly compactionRetries: number
   readonly maxOverflowRetries: number
+  readonly preparationOutputRatio: number
+  readonly preparationMinOutputTokens: number
+  readonly preparationMaxOutputTokens: number
+  readonly preparationConcurrency: number
 }
 
 /** Validated immutable config whose target-specific defaults remain unresolved. */

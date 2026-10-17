@@ -689,7 +689,7 @@ export type ThemePreference = typeof THEME_PREFERENCES[number]
 ## `@deepseek-ai/dsh-compaction-basic`
 
 - `inject`: `llm` · `tokenMeter` · `sessions`
-- `source`: [`packages/compaction/compaction-basic/src/types.ts:40`](../packages/compaction/compaction-basic/src/types.ts)
+- `source`: [`packages/compaction/compaction-basic/src/types.ts:48`](../packages/compaction/compaction-basic/src/types.ts)
 
 ```ts config-catalog
 /** Basic compaction configuration with an optional exact-target policy table. */
@@ -720,6 +720,14 @@ export interface CompactionPolicyConfig {
   compactionRetries?: number
   /** Maximum retries after canonical context overflow; `0` disables recovery. Defaults to `1`. */
   maxOverflowRetries?: number
+  /** Selected-input fraction used for a reviewed range's output budget. Defaults to `0.25`. */
+  preparationOutputRatio?: number
+  /** Minimum reviewed-range output budget before model and context caps. Defaults to `16000`. */
+  preparationMinOutputTokens?: number
+  /** Maximum reviewed-range output budget before model and context caps. Defaults to `128000`. */
+  preparationMaxOutputTokens?: number
+  /** Maximum concurrent range-preparation provider calls. Defaults to `2`. */
+  preparationConcurrency?: number
 }
 
 /** Exact provider/model override merged over the default compaction policy. */

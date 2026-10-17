@@ -10,12 +10,31 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 import type { Session, SessionSeq } from '@deepseek-ai/dsh-session'
 import type { CommandId } from '@deepseek-ai/dsh-commands/brand'
-import type { CompactionResult } from './types.ts'
+import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import type {
+  CompactionPreparation,
+  CompactionPreparationProgress,
+  CompactionPreparationRequest,
+  CompactionResult,
+} from './types.ts'
 import type { CompactionCheckpointSource } from './checkpoint.ts'
+import './directory.ts'
 
-export type { CompactionResult } from './types.ts'
-export { CompactionId } from './brand.ts'
-export { toolPairingBalancedAfter, toolPairingBalancedBefore } from './tool-pairing.ts'
+export type {
+  CompactionPreparation,
+  CompactionPreparationAttempt,
+  CompactionPreparationCall,
+  CompactionPreparationChunk,
+  CompactionPreparationPlan,
+  CompactionPreparationProgress,
+  CompactionPreparationRequest,
+  CompactionPreparationStage,
+  CompactionResult,
+} from './types.ts'
+export { CompactionId, CompactionPreparationId } from './brand.ts'
+export { toolPairingBalancedAfter, toolPairingBalancedBefore, toolPairingCutBalances } from './tool-pairing.ts'
+export { compactionPreparationDigest } from './preparation.ts'
+
 // The checkpoint source constructor and predicate are declared on the cordis-free
 // `./checkpoint` leaf so client and wire programs can name them without this
 // root's Context merge; the root stays the host-side entry point for both.
@@ -119,6 +138,9 @@ declare module '@deepseek-ai/cordis' {
 export abstract class CompactionEngine extends Service {
   constructor(ctx: Context) {
     super(ctx, 'compaction')
+    // The registration belongs to the injected child fiber, so unloading the
+    // directory or this provider removes exactly this contribution.
+    ctx.inject(['compactions'], directoryCtx => directoryCtx.compactions.register(this))
   }
 
   /**
@@ -189,6 +211,44 @@ export abstract class CompactionEngine extends Service {
     end: SessionSeq,
     agent: CompactionAgentContext,
     signal?: AbortSignal,
+  ): Promise<CompactionResult>
+
+  /**
+   * Summarize one stable selected range without changing the Session surface.
+   * The caller records the request before invoking this method and durably
+   * records every progress item before review begins.
+   * @param request - exact selected span, pricing, digest, and optional preservation brief.
+   * @param agent - Agent whose scoped provider and Session own the preparation.
+   * @param signal - cancellation forwarded to every provider call.
+   * @param onProgress - called for the capacity plan, each call attempt, and each successful completion.
+   * @returns deterministic chunks, every call result, and the final generated summary.
+   */
+  abstract prepareRegion(
+    request: CompactionPreparationRequest,
+    agent: CompactionAgentContext,
+    signal: AbortSignal,
+    onProgress: (progress: CompactionPreparationProgress) => Promise<void>,
+  ): Promise<CompactionPreparation>
+
+  /**
+   * Commit one reviewed preparation through short idle maintenance.
+   * Implementations revalidate exact selected membership, digest, balance,
+   * token price, and summary shrink before appending the standard bracket.
+   * @param preparation - generated preparation and provider-call facts.
+   * @param summary - reviewed final summary blocks.
+   * @param source - whether generated output or a human/model edit is committed.
+   * @param admission - idle human maintenance or the caller's already-open model turn.
+   * @param agent - idle Agent whose Session is mutated.
+   * @param signal - cancellation for admission and persistence work.
+   * @returns the committed standard compaction result.
+   */
+  abstract commitPrepared(
+    preparation: CompactionPreparation,
+    summary: readonly ContentBlock[],
+    source: 'generated' | 'human' | 'model',
+    admission: 'idle' | 'current-turn',
+    agent: ManualCompactAgentContext,
+    signal: AbortSignal,
   ): Promise<CompactionResult>
 }
 

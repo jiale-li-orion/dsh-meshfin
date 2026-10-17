@@ -72,6 +72,10 @@ kind: "package-reference"
 | `maxTokens` | `headroomTokens`（`65536`） | 正数摘要输出上限，包含提供方计入的推理 token。显式模型上限覆盖显式全局上限；否则跟随解析后的余量。 |
 | `compactionRetries` | `1` | 压力仍高于阈值时，在首次压缩后进行的额外尝试次数。 |
 | `maxOverflowRetries` | `1` | 已确认上下文窗口溢出后的最大重试次数；`0` 只禁用恢复。 |
+| `preparationOutputRatio` | `0.25` | 作为审阅式范围默认输出目标基础的所选输入比例。 |
+| `preparationMinOutputTokens` | `16000` | 模型与上下文封顶前该输出目标的下界；不得大于 `preparationMaxOutputTokens`。 |
+| `preparationMaxOutputTokens` | `128000` | 模型与上下文封顶前该输出目标的上界。 |
+| `preparationConcurrency` | `2` | 审阅式范围预备期间同时活跃的提供方调用上限。 |
 | `modelPolicies` | `[]` | 针对个别模型路由的精确 `{ provider, model, ...partialPolicy }` 覆盖。 |
 | `auto` | `true` | 启用自动压缩与溢出恢复；设为 `false` 则仅手动执行。 |
 
@@ -106,7 +110,8 @@ kind: "package-reference"
 - **一个测量服务为每个决策定价。** 单例 `ctx.tokenMeter` 会在同一个已消费日志 revision 上测量最新规范已记录 envelope 与当前表层。路由适配器声明请求图片定价时，meter 会将其应用于图片历史。压力、近期尾部保留、范围选择与缩减验证使用同一套路由定价的节点数值；已记录的替换影子价仍使用与路由无关的启发式规则，使纯投影 fold 保持一致。
 - **日志记录的标记对就是事务。** 所有入口点共享一个先记录标记的区域事务：验证范围与活动锁，同步追加 `compaction/start`，准备并等待摘要，重新验证，再追加 `compaction/summary` 与替换，最后恰好进行一次闭合尝试。自动调用与显式范围调用要求数字标识的开放轮次归属与整个表层稳定；`compactNow()` 会预留空闲接纳，使用 `turn: null`，允许所选 span 之外追加仅追加上下文，flush 每次已闭合尝试，并在 `finally` 中释放接纳预留。
 - **摘要复用提供方的热前缀。** 逐字回放 surface 节点 0 处 `system/message` 所承载的系统提示词、上次已路由请求的工具与已遮蔽区域消息，使辅助调用成为会话的真正前缀，因此只有尾随指令与摘要输出未缓存。
-- **`summarize()` 是唯一的子类钩子。** 基于模板或远程摘要器的子类可以覆盖它，同时压力、保留、被引用的源事件、缩减验证与已遮蔽 token 计量仍由 token meter 负责。
+- **`summarize()` 是提供方钩子。** 基于模板或远程摘要器的子类覆盖它；若它不使用 `ctx.llm` 的模型元数据，还要覆盖 `resolvePreparationTarget()`。压力、保留、被引用的源事件、缩减验证与已遮蔽 token 计量仍由 token meter 负责。
+- **审阅式预备是独立阶段。** 调用方先记录所选范围，`prepareRegion` 按确切模型容量制定计划、记录每个分块与每次调用，并在不改动表层的前提下返回摘要；`commitPrepared` 重新校验后通过同一标记对提交。
 
 ### 自动触发与溢出恢复
 
@@ -134,7 +139,8 @@ kind: "package-reference"
 |---|---|
 | [`src/index.ts`](src/index.ts) | 插件入口：`BasicCompactionEngine`、自动 listener、入口点分发 |
 | [`src/region.ts`](src/region.ts) | 保留选择与共享的先记录标记压缩事务 |
-| [`src/summarizer.ts`](src/summarizer.ts) | 默认 `ctx.llm.stream()` 摘要、检查点框定、安全摘要投影 |
+| [`src/preparation.ts`](src/preparation.ts) | 审阅式范围规划：容量策略、确定性分块、map/reduce 轮次、持久调用事实 |
+| [`src/summarizer.ts`](src/summarizer.ts) | 默认 `ctx.llm.stream()` 摘要、位置局部范围指令、检查点框定、安全摘要投影 |
 | [`src/config.ts`](src/config.ts) | 加载时验证与路由模型策略解析 |
 | [`src/types.ts`](src/types.ts) | `BasicCompactionConfig` 与已解析策略词汇 |
 
@@ -168,7 +174,7 @@ kind: "package-reference"
 ##### 会话检查点前导
 
 ```markdown
-This is an automatically generated checkpoint condensing an earlier span of the conversation to free up context. Treat the captured context as established background and build on it without restating it. Continue the task directly from the messages that follow, without acknowledging this checkpoint.
+This is an automatically generated checkpoint condensing an earlier span of the conversation to free up context. Treat the captured context as established background and build on it without restating it. Later context wins if it conflicts with this checkpoint. Continue the task directly from the messages that follow, without acknowledging this checkpoint.
 ```
 
 #### Token 影响
@@ -179,7 +185,7 @@ This is an automatically generated checkpoint condensing an earlier span of the 
 
 它是替换，而非仅追加。每个检查点都会使从第一个已替换历史 token 起的复用失效；该范围之前未更改的请求前缀仍可复用。
 
-### 辅助摘要器请求
+### 自动与 `/compact` 摘要器请求
 
 #### 模型看到的内容
 
@@ -232,6 +238,20 @@ Rules:
 
 已回放系统提示词、工具与已遮蔽区域消息与会话最后一个已路由请求逐字匹配，因此提供方的热前缀 cache 可复用至尾随指令之前；只有该指令与摘要输出未缓存。将摘要器路由到不同提供方／模型，或压缩非头部范围，都会放弃该复用。
 
+### 审阅式范围预备请求
+
+#### 模型看到的内容
+
+审阅式范围按位置局部方式摘要，因此中间范围的成本与无关的保留历史无关。所选范围被渲染成一份由工具配对平衡的 `<context-unit>` 块组成的规范文档，每个块含若干 `<message>` 元素及其内容块。当整份文档连同指令与输出上限能装进模型窗口时，它进入一次 `direct` 调用；否则按容量派生出 `map` 分块，再由 `reduce` 轮次合并这些部分摘要。每次调用都使用同一条固定指令：它点名七个章节 `Outcomes`、`Decisions and Constraints`、`Artifacts and State Changes`、`Commands, Errors, and Results`、`Background Facts Still in Force`、`Open Threads Originating Here`、`Literal Anchors`，声明结果只替换当前位置且不得推断全局当前工作，并附上调用方提供的可选保留要点。
+
+#### Token 影响
+
+默认输出目标为 `min(preparationMaxOutputTokens, max(preparationMinOutputTokens, ceil(selectedTokens × preparationOutputRatio)))`，再被该路由声明的单次请求输出上限进一步压低。预备不新增任何会话消息、也不改动表层：成本仅为摘要调用本身，每轮由 `preparationConcurrency` 限制并发调用数。map/reduce 的每轮把单次输出压在窗口的四分之一以内，因此剩余容量总能容纳下一轮。
+
+#### KV Cache 影响
+
+范围调用是独立的位置局部请求，不承诺复用会话前缀。之后的提交会保留所选范围之前的会话前缀，并从该位置起使其失效。
+
 ## 已知限制与暂缓事项
 
 <a id="known-limitations-and-deferred-work"></a>
@@ -243,7 +263,9 @@ Rules:
 - **溢出分类由适配器维护**——提供方措辞可能改变；两个 DeepSeek 适配器将可识别的上下文限制失败规范化为 `CONTEXT_WINDOW_EXCEEDED`。
 - **部分不可分单元与仅 envelope 溢出仍不在表层压缩范围内**——恢复无法缩减系统／工具／前缀、拆分不可分的非工具节点，或修复不可剪枝剩余部分仍超出窗口的工具单元。可选 pruner 可以缩减原本不可分工具对内的文本型工具结果主体。
 - **`compactRegion` 要求存在未结束的轮次**——在完全关闭的会话上手动调用会抛出异常（「no open turn」），而不是执行压缩。
-- **摘要失败会保留最新持久表层**——任何替换前，自动路径会记录警告，并携带完整超预算历史继续。如果剪枝已落地，后续摘要失败会从该持久剪枝表层继续。因达到 `maxTokens` 而发生的摘要截断（隐藏推理 token 可能会耗尽该额度）遵循同一规则。
+- **摘要失败会保留最新持久表层**——任何替换前，自动路径会记录警告，并携带完整超预算历史继续。如果剪枝已落地，后续摘要失败会从该持久剪枝表层继续。因达到 `maxTokens`，或因达到审阅式预备的实际输出上限，而发生的摘要截断（隐藏推理 token 可能会耗尽该额度）遵循同一规则。
+- **审阅式预备没有随包驱动**——`prepareRegion` 与 `commitPrepared` 是完整的后端操作，但本代码树中没有任何插件把它们暴露给模型工具或人类命令；预备事件与审阅编辑由调用方自行记录。
+- **审阅式范围整体计价**——预备与提交各自通过 `ctx.tokenMeter` 读取一次全表层测量；没有更窄的位置局部测量 API 可调用。
 
 <a id="dev-note"></a>
 ### 开发备注

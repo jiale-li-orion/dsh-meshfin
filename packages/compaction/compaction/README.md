@@ -48,7 +48,7 @@ With these two rows the feature is on: the conversation condenses automatically 
 
 ### Implementing a backend
 
-Extend the provided base class and implement three operations: one that decides and performs condensation for an automatic trigger, one that condenses on demand, and one that condenses an explicit range of the conversation. Load your class as a plugin and it becomes the condensation service for the composition. The exact signatures, the failure rules, and the checkpoint marker every backend must produce are in the implementation section below and in the [compaction subsystem reference](../../../docs/subsystems/compaction.md).
+Extend the provided base class and implement five operations: one that decides and performs condensation for an automatic trigger, one that condenses on demand, one that condenses an explicit range of the conversation, one that prepares a reviewable summary of an already-recorded range without mutating the conversation, and one that commits a reviewed preparation. Load your class as a plugin and it becomes the condensation service for the composition. The exact signatures, the failure rules, and the checkpoint marker every backend must produce are in the implementation section below and in the [compaction subsystem reference](../../../docs/subsystems/compaction.md).
 
 ### Recognizing condensed history
 
@@ -75,9 +75,15 @@ The seam is built on one split and three commitments:
 
 ### Service API
 
-The contract is three abstract operations a backend implements: `compactIfNeeded` for automatic `pressure` or `context-overflow` triggers, `compactNow` for one explicit on-demand reduction, and `compactRegion` for a caller-selected surface range. Reusable request measurement is a separate service, `ctx.tokenMeter`. The exhaustive per-operation semantics live in the [compaction subsystem reference](../../../docs/subsystems/compaction.md); the exact signatures are in [`src/index.ts`](src/index.ts).
+The contract is five abstract operations a backend implements: `compactIfNeeded` for automatic `pressure` or `context-overflow` triggers, `compactNow` for one explicit on-demand reduction, `compactRegion` for a caller-selected surface range, `prepareRegion` for a reviewable summary of an already-recorded range, and `commitPrepared` for the reviewed result. Reusable request measurement is a separate service, `ctx.tokenMeter`. The exhaustive per-operation semantics live in the [compaction subsystem reference](../../../docs/subsystems/compaction.md); the exact signatures are in [`src/index.ts`](src/index.ts).
 
-A backend that summarizes through `ctx.llm.stream()` must forward the abort signal into the call's `GenerateOptions.signal`, so an abort or fiber dispose tears down the in-flight summarization. Automatic and explicit-region brackets recover their numeric owner from the open turn; manual brackets require no open turn and stamp `turn: null`.
+`prepareRegion(request, agent, signal, onProgress)` writes nothing to the surface: it revalidates the recorded span, prices its provider plan, and reports every planned chunk, call attempt, and completed call through `onProgress` so the caller can make each one durable before review begins. `commitPrepared(preparation, summary, source, admission, agent, signal)` revalidates exact membership, digest, tool balance, and token price, then commits the reviewed summary through the same bracket as every other entry point — under idle maintenance or inside the caller's already-open turn.
+
+A backend that summarizes through `ctx.llm.stream()` must forward the abort signal into the call's `GenerateOptions.signal`, so an abort or fiber dispose tears down the in-flight summarization. Automatic and explicit-region brackets recover their numeric owner from the open turn; manual and reviewed-idle brackets require no open turn and stamp `turn: null`.
+
+### Provider resolution
+
+Every `CompactionEngine` registers with `ctx.compactions` from its constructor, in an injected child fiber, so the contribution is disposed with the provider. `CompactionDirectory.resolve(agent)` returns the provider registered for that exact Agent and otherwise the process fallback, and throws when neither exists, so a caller never silently uses another Agent's summarizer. `register(provider, agent)` accepts the Agent-scoped form for compositions that own their own provider; this tree registers the process fallback only, because it has no Agent-scoped consumer.
 
 ### Manual failure taxonomy
 
@@ -88,7 +94,7 @@ Expected manual failures throw `ManualCompactionError` with a stable `code` from
 <a id="tool-pairing-boundaries"></a>
 ### Tool-pairing boundaries
 
-The Service Definition exports `toolPairingBalancedBefore(session, seq)` and `toolPairingBalancedAfter(session, seq)` for snapping and validating compaction edges. A safe edge has no unanswered assistant tool call crossing it. Each helper validates that the event sequence is in the current surface and answers from balances cached per cut in surface order, so repeated checks read no events; a replace generation rebuilds the cache, and missing seqs or an orphan `tool/result` reject as corrupt surface state.
+The Service Definition exports `toolPairingBalancedBefore(session, seq)` and `toolPairingBalancedAfter(session, seq)` for snapping and validating compaction edges, plus `toolPairingCutBalances(session)` for a caller that needs every cut of the current surface at once. A safe edge has no unanswered assistant tool call crossing it. Each helper validates that the event sequence is in the current surface and answers from balances cached per cut in surface order, so repeated checks read no events; a replace generation rebuilds the cache, and missing seqs or an orphan `tool/result` reject as corrupt surface state. A surface of N nodes has N + 1 cuts, so `toolPairingCutBalances` returns entry `i` for the cut before position `i` and the final entry for the cut after the tail.
 
 ### The surface contract
 
@@ -102,9 +108,11 @@ The replacement sits inside the lock bracket, so a crash between `compaction/sta
 |---|---|
 | [`src/index.ts`](src/index.ts) | Plugin entry: abstract `CompactionEngine`, `CompactionTrigger`, `ManualCompactionError`, `ctx.compaction` merge |
 | [`src/types.ts`](src/types.ts) | `CompactionResult` and the declaration-merged `compaction/*` session events |
-| [`src/tool-pairing.ts`](src/tool-pairing.ts) | Per-session cut-balance cache behind the two boundary helpers |
+| [`src/tool-pairing.ts`](src/tool-pairing.ts) | Per-session cut-balance cache behind the two boundary helpers and `toolPairingCutBalances` |
+| [`src/preparation.ts`](src/preparation.ts) | Cordis-free preparation digest shared by producers and consumers |
+| [`src/directory.ts`](src/directory.ts) | `CompactionDirectory` (`ctx.compactions`): per-Agent provider registrations plus the process fallback (`./directory` leaf) |
 | [`src/checkpoint.ts`](src/checkpoint.ts) | Cordis-free checkpoint source constructor and predicate (`./checkpoint` leaf) |
-| [`src/brand.ts`](src/brand.ts) | `CompactionId` branded identity |
+| [`src/brand.ts`](src/brand.ts) | `CompactionId` and `CompactionPreparationId` branded identities |
 
 ### Locking and serialization
 
@@ -113,6 +121,8 @@ One log-recorded lock is shared by all entry points. Tail inspection finds the l
 ### Events
 
 The `compaction/*` events extend `SessionEventMap` (merge-extensible) via declaration merging — session events, not Cordis `Events`, and all log-only. The generated [persistence log event catalog](../../../docs/persistence-catalog.md) owns the per-event payloads; `compaction/prune` documents the shadow-price protocol shared with the tool-result pruner.
+
+The `compaction/preparation/*` events record reviewed range work independently of the bracket: `requested` (the selected span, its digest, and its route price), `planned` (the capacity strategy and its initial chunks), `attempted` (one provider call's envelope, written before its stream starts), `call` (one completed call with its output and usage), `ready` (the generated summary and chunk plan), `edited` (a review edit whose latest value is the commit candidate), `failed` (a terminal preparation failure before any surface mutation), and `discarded` (a reviewed preparation abandoned without touching the surface). A later bracket names the preparation it commits through `preparationId`.
 
 </details>
 
@@ -156,7 +166,7 @@ A successful backend replacement invalidates reuse from the first shadowed histo
 
 These limits describe what condensation cannot do, regardless of which backend is loaded; they are the current package constraints.
 
-- **Human command, not a model tool** — condensation is triggered by the `/compact` command and by automatic pressure; no model-facing compaction tool is registered.
+- **Human command, not a model tool** — condensation is triggered by the `/compact` command and by automatic pressure; no model-facing compaction tool is registered. Reviewed preparation is a backend and host API (`prepareRegion`/`commitPrepared`), and no shipped plugin in this tree drives it from a model tool.
 - **Some single-unit overflow is out of contract** — balanced summary compaction cannot split one indivisible unit. The optional pruning companion can still repair a closed tool pair when text-bearing tool-result bulk is removable; a large non-tool node or a tool unit whose non-prunable remainder is oversized cannot be compacted.
 - **An envelope that alone approaches the window is not surface-compaction work** — compaction shrinks derived history, never the system prompt, tools, or session prefix.
 
