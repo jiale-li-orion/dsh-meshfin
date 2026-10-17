@@ -364,6 +364,8 @@
     { "path": "./packages/experimental/worktree" },
     { "path": "./packages/experimental/tool-worktree" },
     { "path": "./packages/session/tool-working-directory" },
+    { "path": "./packages/session/session-context" },
+    { "path": "./packages/session/tool-session-context" },
     { "path": "./packages/session/session-title-llm" },
     { "path": "./packages/session/session-title-first-prompt-llm" },
     { "path": "./packages/experimental/session-title-all-prompts-llm" },

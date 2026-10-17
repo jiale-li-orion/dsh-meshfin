@@ -1,0 +1,28 @@
+# Bilingual-pair consistency record for 2026-10-17-session-context-rewrite.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/persistence-changes/2026-10-17-session-context-rewrite.md
+/:
+  en: 3d5a424ae7d7e46b
+  zh: c22a8e4a62d8cc1a
+/2026-10-17-session-context-rewrite:
+  en: ce0c0298953b7fe7
+  zh: eb85a95f878cc5e2
+/2026-10-17-session-context-rewrite/summary:
+  en: 999957cee2f89a4d
+  zh: 36bbbb0c26df7f5b
+/2026-10-17-session-context-rewrite/table-of-contents:
+  en: 6cf314a069ceb451
+  zh: 9adff678e9ecab3b
+/2026-10-17-session-context-rewrite/declaration:
+  en: 6907136f28e48c90
+  zh: 02f8298485f3d8e7
+/2026-10-17-session-context-rewrite/compatibility:
+  en: 8a2875dc3e392080
+  zh: b001ce40996b8d3d
+/2026-10-17-session-context-rewrite/verification:
+  en: 6933aa7f692a455b
+  zh: 897d3d7e09907c72
+/2026-10-17-session-context-rewrite/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269

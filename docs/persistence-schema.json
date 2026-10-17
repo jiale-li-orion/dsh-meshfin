@@ -8491,6 +8491,136 @@
       }
     },
     {
+      "key": "event:context/rewrite",
+      "kind": "event",
+      "event": "context/rewrite",
+      "surface": false,
+      "digest": "5d0ac8cc07cea04c25961bfe73490eb7f61d11900e28b9185b00341e22556e13",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "mode",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "replacementSeq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "rewriteId",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "shadowedRange",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "shadowedSeqs",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "shadowedTokenCount",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "edit-and-continue"
+          },
+          {
+            "kind": "literal",
+            "value": "patch"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "end",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "start",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 5
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "context/rewrite"
+          }
+        ]
+      }
+    },
+    {
       "key": "event:deliverables/presented",
       "kind": "event",
       "event": "deliverables/presented",
@@ -25281,6 +25411,13 @@
       ]
     },
     {
+      "digest": "376d49005f0a683bb8cc372278cb0a4dca891b8ed5a9b6d4b5c5f58ed30efed6",
+      "names": [],
+      "sources": [
+        "packages/session/session-context/src/types.ts:228"
+      ]
+    },
+    {
       "digest": "378cbd5f048342aeb4d07b8a9879164c634cfbbf37770ba1c9868d929e269fab",
       "names": [],
       "sources": []
@@ -25644,6 +25781,7 @@
         "packages/llm/llm/src/brand.ts#ReasoningEffortId",
         "packages/llm/llm/src/brand.ts#ToolCallId",
         "packages/schedule/schedule/src/types.ts#ScheduleId",
+        "packages/session/session-context/src/brand.ts#ContextRewriteId",
         "packages/session/session-title/src/index.ts#SessionTitleProviderId",
         "packages/session/session-title/src/types.ts#SessionTitleProviderId",
         "packages/workflow/workflow/src/types.ts#WorkflowRunId"
@@ -25671,6 +25809,7 @@
         "packages/llm/llm/src/brand.ts:43",
         "packages/llm/llm/src/brand.ts:67",
         "packages/schedule/schedule/src/types.ts:14",
+        "packages/session/session-context/src/brand.ts:9",
         "packages/session/session-title/src/index.ts:42",
         "packages/session/session-title/src/types.ts:17",
         "packages/workflow/workflow/src/types.ts:13"
@@ -25939,6 +26078,11 @@
     },
     {
       "digest": "5d03ba38734809bcbd2a55221bd938b3b3fc34b49bb686c6113e9e4931e3aa78",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "5d0ac8cc07cea04c25961bfe73490eb7f61d11900e28b9185b00341e22556e13",
       "names": [],
       "sources": []
     },
@@ -26941,7 +27085,8 @@
       "names": [],
       "sources": [
         "packages/compaction/compaction/src/types.ts:195",
-        "packages/compaction/compaction/src/types.ts:248"
+        "packages/compaction/compaction/src/types.ts:248",
+        "packages/session/session-context/src/types.ts:236"
       ]
     },
     {
@@ -26966,6 +27111,15 @@
       "names": [],
       "sources": [
         "packages/compaction/compaction/src/types.ts:257"
+      ]
+    },
+    {
+      "digest": "a011f5d8efd47c035b333ec740ae43da05318ef46015e064598a1c328e2f80f3",
+      "names": [
+        "packages/session/session-context/src/types.ts#ContextRewriteMode"
+      ],
+      "sources": [
+        "packages/session/session-context/src/types.ts:120"
       ]
     },
     {
@@ -27826,6 +27980,11 @@
       "sources": []
     },
     {
+      "digest": "db0927b391ddd3adeeadf2a9af068617cba2abcd72e3b20a2a05e5b8c683fbae",
+      "names": [],
+      "sources": []
+    },
+    {
       "digest": "db6c5246911d47a7969f6b4cb47c7d0dbbde75c402710b22ace3672fa97bebe0",
       "names": [],
       "sources": []
@@ -27903,6 +28062,11 @@
     },
     {
       "digest": "e0a787e6ec76c7c94fecbc501b489164ab0293db05bc947914077ad01e674f05",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "e17e298385812d3e74f961e5682247b4f919106e77ce46f9fa837b4d9e3f36f1",
       "names": [],
       "sources": []
     },
@@ -28419,6 +28583,11 @@
     },
     {
       "digest": "fee1caf8ab6a65c1bc981f5a1730164490f22a2a89ffa3d0b76f1f432c44c8b5",
+      "names": [],
+      "sources": []
+    },
+    {
+      "digest": "ffb7d6fc0d486dc192bbed6dd25bbe512493c4fd215b83d11e1053cda8bdc673",
       "names": [],
       "sources": []
     }

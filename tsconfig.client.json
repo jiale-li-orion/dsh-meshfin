@@ -155,5 +155,6 @@
     { "path": "./apps/web" }
   ,
     { "path": "./packages/workbench/workbench" },
-    { "path": "./packages/workbench/workbench-bytes" }]
+    { "path": "./packages/workbench/workbench-bytes" },
+    { "path": "./packages/session/session-context" }]
 }

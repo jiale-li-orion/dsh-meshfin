@@ -1,0 +1,136 @@
+{
+  "formatVersion": 2,
+  "roots": [
+    {
+      "key": "event:context/rewrite",
+      "kind": "event",
+      "event": "context/rewrite",
+      "surface": false,
+      "digest": "5d0ac8cc07cea04c25961bfe73490eb7f61d11900e28b9185b00341e22556e13",
+      "schema": {
+        "root": 0,
+        "nodes": [
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "data",
+                "type": 1,
+                "optional": false
+              },
+              {
+                "name": "ignorable",
+                "type": 9,
+                "optional": true
+              },
+              {
+                "name": "seq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "time",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "type",
+                "type": 10,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "mode",
+                "type": 2,
+                "optional": false
+              },
+              {
+                "name": "replacementSeq",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "rewriteId",
+                "type": 6,
+                "optional": false
+              },
+              {
+                "name": "shadowedRange",
+                "type": 7,
+                "optional": false
+              },
+              {
+                "name": "shadowedSeqs",
+                "type": 8,
+                "optional": false
+              },
+              {
+                "name": "shadowedTokenCount",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "union",
+            "types": [
+              3,
+              4
+            ]
+          },
+          {
+            "kind": "literal",
+            "value": "edit-and-continue"
+          },
+          {
+            "kind": "literal",
+            "value": "patch"
+          },
+          {
+            "kind": "primitive",
+            "type": "number"
+          },
+          {
+            "kind": "primitive",
+            "type": "string"
+          },
+          {
+            "kind": "object",
+            "properties": [
+              {
+                "name": "end",
+                "type": 5,
+                "optional": false
+              },
+              {
+                "name": "start",
+                "type": 5,
+                "optional": false
+              }
+            ],
+            "indices": []
+          },
+          {
+            "kind": "array",
+            "element": 5
+          },
+          {
+            "kind": "literal",
+            "value": true
+          },
+          {
+            "kind": "literal",
+            "value": "context/rewrite"
+          }
+        ]
+      }
+    }
+  ],
+  "types": []
+}

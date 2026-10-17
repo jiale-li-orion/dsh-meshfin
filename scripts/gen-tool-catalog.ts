@@ -62,12 +62,16 @@ import Lsp from '@deepseek-ai/dsh-lsp'
 import * as ToolLsp from '@deepseek-ai/dsh-tool-lsp'
 import * as ToolSkill from '@deepseek-ai/dsh-tool-skill'
 import * as ToolSessionQuery from '@deepseek-ai/dsh-tool-session-query'
+import * as ToolSessionContext from '@deepseek-ai/dsh-tool-session-context'
+import type SessionContextService from '@deepseek-ai/dsh-session-context'
 import * as ToolJobs from '@deepseek-ai/dsh-tool-jobs'
 import BrowserUseRegistry from '@deepseek-ai/dsh-browser-use'
 import * as StagehandBrowserTools from '@deepseek-ai/dsh-experimental-browser-use-stagehand-native'
 import type TeamService from '@deepseek-ai/dsh-experimental-agent-team'
 import * as ToolTeam from '@deepseek-ai/dsh-experimental-tool-agent-team'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
+import * as ToolWorkbench from '@deepseek-ai/dsh-tool-workbench'
+import type WorkbenchService from '@deepseek-ai/dsh-workbench'
 import type PluginManager from '@deepseek-ai/dsh-plugin-manager'
 import * as PluginManagerTools from '@deepseek-ai/dsh-plugin-manager/tools'
 import type PluginMarket from '@deepseek-ai/dsh-plugin-market'
@@ -505,6 +509,21 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
   },
   {
+    pkg: '@deepseek-ai/dsh-tool-session-context',
+    dir: 'tool-session-context',
+    source: 'packages/session/tool-session-context/src/index.ts',
+    requires: ['ctx.tools', 'ctx.systemPrompt', 'ctx.sessionContext', 'a calling Agent'],
+    writes: ['tool/call', 'compaction/preparation/* plus one compaction bracket on commit', 'tool/result'],
+    async mount(ctx) {
+      // Schema harvest never inspects or commits, so the Host service is a
+      // declaration-only stub.
+      ctx.provide('sessionContext', {} as SessionContextService)
+      await ctx.plugin(ToolSessionContext)
+    },
+    note:
+      'The five `context_*` tools run against the calling Agent. `context_prepare` records a reviewable summary without changing context; only `context_commit` replaces the selected range, and the originals stay recallable. `history_read` and `history_search` take a checkpoint id from `context_inspect`.',
+  },
+  {
     pkg: '@deepseek-ai/dsh-tool-session-query',
     dir: 'tool-session-query',
     source: 'packages/experimental/tool-session-query/src/index.ts',
@@ -621,6 +640,21 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-workbench',
+    dir: 'tool-workbench',
+    source: 'packages/workbench/tool-workbench/src/index.ts',
+    requires: ['ctx.tools', 'ctx.workbench'],
+    writes: ['tool/call', 'tool/result'],
+    async mount(ctx) {
+      // Schema harvest never commits a view, so the Host service is a
+      // declaration-only stub.
+      ctx.provide('workbench', {} as WorkbenchService)
+      await ctx.plugin(ToolWorkbench)
+    },
+    note:
+      'The view is process-global rather than session-owned, so every call touches the built-in `global` resource and `workbench/changed` carries each committed view to the browser and the agent alike.',
   },
   {
     pkg: '@deepseek-ai/dsh-tool-working-directory',
