@@ -1,11 +1,34 @@
 import { describe, expect, it } from 'vitest'
-import { clampWidth, computeColumns } from '../src/client/columns.ts'
+import {
+  clampWidth, computeColumns, computeSinglePanel, SIDEBAR_AUTO_COLLAPSE, SINGLE_PANEL_MAX,
+} from '../src/client/columns.ts'
 
 describe('clampWidth', () => {
   it('clamps into the range and rounds', () => {
     expect(clampWidth(250.4, 240, 420)).toBe(250)
     expect(clampWidth(100, 240, 420)).toBe(240)
     expect(clampWidth(9999, 240, 420)).toBe(420)
+  })
+})
+
+describe('single-panel breakpoint', () => {
+  it('sits at the right panel occupant\u2019s own fullscreen width, below the sidebar auto-collapse', () => {
+    expect(SINGLE_PANEL_MAX).toBe(768)
+    expect(SINGLE_PANEL_MAX).toBeLessThan(SIDEBAR_AUTO_COLLAPSE)
+  })
+})
+
+describe('computeSinglePanel', () => {
+  it.each([
+    ['nav', [390, 0, 0]],
+    ['main', [0, 390, 0]],
+    ['right', [0, 0, 390]],
+  ] as const)('gives the %s page the whole frame', (page, [sidebar, center, rightbar]) => {
+    expect(computeSinglePanel(page, 390)).toEqual({ sidebar, center, rightbar })
+  })
+
+  it('leaves nothing to a page at zero width', () => {
+    expect(computeSinglePanel('nav', 0)).toEqual({ sidebar: 0, center: 0, rightbar: 0 })
   })
 })
 

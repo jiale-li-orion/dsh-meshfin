@@ -1,0 +1,52 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/client/ui-context/README.md
+/deepseek-ai-dsh-client-ui-context:
+  en: acc2296d089ad31b
+  zh: e0f44826395b6b43
+/deepseek-ai-dsh-client-ui-context/user-workflow:
+  en: d2270a7af8aa09d0
+  zh: 6742779c14807b48
+/deepseek-ai-dsh-client-ui-context/user-workflow/edit-and-continue:
+  en: 21d7a02f5583c70f
+  zh: 2ed11e7a904bb909
+/deepseek-ai-dsh-client-ui-context/user-workflow/compact-a-selected-range:
+  en: 00d1bd192aafbac3
+  zh: b92c840b22f46a2c
+/deepseek-ai-dsh-client-ui-context/user-workflow/recall-checkpoint-originals:
+  en: 59f43d73b985e411
+  zh: eb759e41f99e010c
+/deepseek-ai-dsh-client-ui-context/architecture:
+  en: dcec295c441b98e2
+  zh: 3761a7ed580dc67c
+/deepseek-ai-dsh-client-ui-context/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-client-ui-context/model-experience/context-inspection-ui:
+  en: d720c4fdecfb6d47
+  zh: 694183f2a9269006
+/deepseek-ai-dsh-client-ui-context/model-experience/context-inspection-ui/what-the-model-sees:
+  en: e8278e0ee828dbf9
+  zh: 76de3bbcc1504380
+/deepseek-ai-dsh-client-ui-context/model-experience/context-inspection-ui/token-effect:
+  en: 1f10c7e5b32cf2ef
+  zh: 205db5c92174ab12
+/deepseek-ai-dsh-client-ui-context/model-experience/context-inspection-ui/kv-cache-effect:
+  en: 179ebfdabcd94862
+  zh: 7ba60d3630a9b645
+/deepseek-ai-dsh-client-ui-context/model-experience/human-rewrite-and-compaction-actions:
+  en: 4d6e99d0076f7987
+  zh: af48de6c2c3504a7
+/deepseek-ai-dsh-client-ui-context/model-experience/human-rewrite-and-compaction-actions/what-the-model-sees:
+  en: 6fb0e754c6b02447
+  zh: cdd4db5b9f13c6f4
+/deepseek-ai-dsh-client-ui-context/model-experience/human-rewrite-and-compaction-actions/token-effect:
+  en: af21cebe4d78ed6c
+  zh: fb8d2e5ad1d59324
+/deepseek-ai-dsh-client-ui-context/model-experience/human-rewrite-and-compaction-actions/kv-cache-effect:
+  en: 4b5fe2cf5cbcee2c
+  zh: 0e44064d10817b06
+/deepseek-ai-dsh-client-ui-context/known-limitations-and-deferred-work:
+  en: c53a9dab01afb389
+  zh: 9f3b9a21c32117b2

@@ -101,6 +101,8 @@
     { "path": "./packages/client/ui-approval" },
     { "path": "./packages/client/ui-chat/tsconfig.client.json" },
     { "path": "./packages/client/ui-conversation/tsconfig.client.json" },
+    { "path": "./packages/client/ui-context" },
+    { "path": "./packages/client/ui-workbench" },
     { "path": "./packages/client/ui-tool" },
     { "path": "./packages/client/ui-deliverables/tsconfig.client.json" },
     { "path": "./packages/client/ui-workflow-run" },

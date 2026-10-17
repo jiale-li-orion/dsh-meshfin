@@ -5,6 +5,7 @@
  * capacity. */
 
 import { useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 // Type-only: the `contextPressure` / `contextBreakdown` projection key merges.
@@ -51,9 +52,11 @@ export interface ContextMeterProps {
   useProjection: UseProjection
   /** The owning bar's locale seat, passed down as a plain prop. */
   t: ComposerBarProps['t']
+  /** Occupancy-panel action rows contributed by other features, below the breakdown. */
+  actions?: ReactNode
 }
 
-export function ContextMeter({ useProjection, t }: ContextMeterProps) {
+export function ContextMeter({ useProjection, t, actions }: ContextMeterProps) {
   const pressure = useProjection('contextPressure')
   const breakdown = useProjection('contextBreakdown')
   const [open, setOpen] = useState(false)
@@ -172,6 +175,7 @@ export function ContextMeter({ useProjection, t }: ContextMeterProps) {
               ))}
             </dl>
           )}
+          {actions !== undefined && <div className={css.actions}>{actions}</div>}
         </div>,
         document.body,
       )}

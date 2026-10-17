@@ -8,10 +8,11 @@ beforeEach(() => { vi.stubGlobal('innerWidth', 1920) })
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('createLayoutStore', () => {
-  it('starts with the default sidebar and no right panel preference', () => {
+  it('starts on the main page with the default sidebar and no right panel preference', () => {
     const { store } = createLayoutStore().create()
     expect(store.getSnapshot()).toEqual({
       panelInfo: { activePanelId: null },
+      page: 'main',
       layoutInfo: {
         sidebar: 280,
         viewportWidth: 1920,
@@ -139,87 +140,159 @@ describe('main panel selection', () => {
   )
 })
 
-describe('right panel', () => {
-  it('initializes at 45% of the latest frame only on first opening', () => {
+describe('single-panel page', () => {
+  it('writes the page without touching geometry or panel selection', () => {
     const { store, actions } = createLayoutStore().create()
-    actions.setViewportWidth(1000)
-    expect(store.getSnapshot().layoutInfo.rightbar).toBeNull()
-    actions.openRightbar(true, false)
-    expect(store.getSnapshot().layoutInfo.rightbar).toBe(450)
-    actions.setViewportWidth(2000)
-    actions.openRightbar(true, true)
-    expect(store.getSnapshot().layoutInfo.rightbar).toBe(450)
-    actions.closeRightbar()
-    actions.openRightbar(true, false)
-    expect(store.getSnapshot().layoutInfo.rightbar).toBe(450)
+    actions.setViewportWidth(390)
+    const before = store.getSnapshot()
+    for (const page of ['nav', 'right', 'main'] as const) {
+      actions.setPage(page)
+      expect(store.getSnapshot().page).toBe(page)
+      expect(store.getSnapshot().layoutInfo).toBe(before.layoutInfo)
+      expect(store.getSnapshot().panelInfo).toBe(before.panelInfo)
+    }
+    const selected = store.getSnapshot()
+    actions.setPage('main')
+    expect(store.getSnapshot()).toBe(selected)
   })
 
-  it('keeps track and fullscreen reports independent and clears both on close', () => {
+  it.each([[767, 768], [768, 767]])('returns to the main page when the frame crosses %ipx to %ipx', (from, to) => {
     const { store, actions } = createLayoutStore().create()
-    actions.openRightbar(true, false)
-    expect(store.getSnapshot().layoutInfo).toMatchObject({ rightbarShown: true, rightbarTrack: true, rightbarFullscreen: false })
-    actions.openRightbar(true, true)
-    expect(store.getSnapshot().layoutInfo).toMatchObject({ rightbarShown: true, rightbarTrack: true, rightbarFullscreen: true })
-    actions.openRightbar(false, true)
-    expect(store.getSnapshot().layoutInfo).toMatchObject({ rightbarShown: true, rightbarTrack: false, rightbarFullscreen: true })
-    actions.closeRightbar()
-    expect(store.getSnapshot().layoutInfo).toMatchObject({ rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false })
+    actions.setViewportWidth(from)
+    actions.setPage('nav')
+    actions.setViewportWidth(to)
+    expect(store.getSnapshot().page).toBe('main')
   })
 
-  it('keeps dragged px preferences across resize, close, and reopen', () => {
+  it('keeps the page while the frame stays on one side of the breakpoint', () => {
     const { store, actions } = createLayoutStore().create()
-    actions.openRightbar(true, false)
-    actions.setRightbar(1100)
-    actions.setViewportWidth(800)
-    expect(store.getSnapshot().layoutInfo.rightbar).toBe(1100)
-    actions.closeRightbar()
-    actions.openRightbar(false, true)
-    expect(store.getSnapshot().layoutInfo.rightbar).toBe(1100)
+    actions.setViewportWidth(390)
+    actions.setPage('nav')
+    actions.setViewportWidth(400)
+    expect(store.getSnapshot().page).toBe('nav')
+    actions.setViewportWidth(1200)
+    actions.setPage('right')
+    actions.setViewportWidth(1024)
+    expect(store.getSnapshot().page).toBe('right')
   })
 
-  it('clamps drag preferences to 300px and 70% of the current frame', () => {
+  it('switches the page on the sidebar toggle below the breakpoint and keeps the override above it', () => {
     const { store, actions } = createLayoutStore().create()
-    actions.setViewportWidth(1600)
-    actions.setRightbar(9999)
-    expect(store.getSnapshot().layoutInfo.rightbar).toBe(1120)
-    actions.setViewportWidth(1000)
-    actions.setRightbar(9999)
-    expect(store.getSnapshot().layoutInfo.rightbar).toBe(700)
-    actions.setRightbar(1)
-    expect(store.getSnapshot().layoutInfo.rightbar).toBe(300)
-  })
-
-  it('retains a minimum normal preference when first opened fullscreen on a phone', () => {
-    const { store, actions } = createLayoutStore().create()
-    actions.setViewportWidth(320)
-    actions.openRightbar(false, true)
-    expect(store.getSnapshot().layoutInfo.rightbar).toBe(300)
-  })
-
-  it('collapses a manually expanded narrow sidebar on opening, not presentation reports', () => {
-    const { store, actions } = createLayoutStore().create()
-    actions.setSidebar(400)
-    actions.setViewportWidth(800)
+    actions.setViewportWidth(390)
     actions.toggleSidebar()
-    actions.openRightbar(true, false)
-    expect(store.getSnapshot().layoutInfo).toMatchObject({ sidebar: 400, narrowExpanded: false })
+    expect(store.getSnapshot()).toMatchObject({ page: 'nav', layoutInfo: { narrowExpanded: false, sidebar: 280 } })
     actions.toggleSidebar()
-    actions.openRightbar(true, true)
-    expect(store.getSnapshot().layoutInfo.narrowExpanded).toBe(true)
-    actions.closeRightbar()
-    actions.openRightbar(true, false)
-    expect(store.getSnapshot().layoutInfo.narrowExpanded).toBe(false)
+    expect(store.getSnapshot()).toMatchObject({ page: 'main', layoutInfo: { narrowExpanded: false, sidebar: 280 } })
+    actions.setViewportWidth(980)
+    actions.toggleSidebar()
+    expect(store.getSnapshot()).toMatchObject({ page: 'main', layoutInfo: { narrowExpanded: true } })
   })
 
-  it('keeps the wide sidebar preference and never opens a closed right panel on resize', () => {
+  it('follows the first right-panel opening below the breakpoint and leaves a wide frame alone', () => {
     const { store, actions } = createLayoutStore().create()
-    actions.setSidebar(420)
-    actions.openRightbar(true, false)
-    expect(store.getSnapshot().layoutInfo.sidebar).toBe(420)
-    actions.closeRightbar()
-    actions.setViewportWidth(3000)
-    expect(store.getSnapshot().layoutInfo).toMatchObject({ sidebar: 420, rightbarShown: false, rightbarTrack: false })
+    actions.setViewportWidth(390)
+    actions.openRightbar(false, true)
+    expect(store.getSnapshot().page).toBe('right')
+    actions.setPage('nav')
+    actions.openRightbar(false, true)
+    expect(store.getSnapshot().page).toBe('nav')
+    const wide = createLayoutStore().create()
+    wide.actions.openRightbar(true, false)
+    expect(wide.store.getSnapshot().page).toBe('main')
   })
+
+  it('returns the right page to the main page when the panel closes', () => {
+    const { store, actions } = createLayoutStore().create()
+    actions.setViewportWidth(390)
+    actions.openRightbar(false, true)
+    actions.closeRightbar()
+    expect(store.getSnapshot()).toMatchObject({ page: 'main', layoutInfo: { rightbarShown: false } })
+    const closed = store.getSnapshot()
+    actions.closeRightbar()
+    expect(store.getSnapshot()).toBe(closed)
+  })
+})
+
+describe('right panel', () => {  it('initializes at 45% of the latest frame only on first opening', () => {
+  const { store, actions } = createLayoutStore().create()
+  actions.setViewportWidth(1000)
+  expect(store.getSnapshot().layoutInfo.rightbar).toBeNull()
+  actions.openRightbar(true, false)
+  expect(store.getSnapshot().layoutInfo.rightbar).toBe(450)
+  actions.setViewportWidth(2000)
+  actions.openRightbar(true, true)
+  expect(store.getSnapshot().layoutInfo.rightbar).toBe(450)
+  actions.closeRightbar()
+  actions.openRightbar(true, false)
+  expect(store.getSnapshot().layoutInfo.rightbar).toBe(450)
+})
+
+it('keeps track and fullscreen reports independent and clears both on close', () => {
+  const { store, actions } = createLayoutStore().create()
+  actions.openRightbar(true, false)
+  expect(store.getSnapshot().layoutInfo).toMatchObject({ rightbarShown: true, rightbarTrack: true, rightbarFullscreen: false })
+  actions.openRightbar(true, true)
+  expect(store.getSnapshot().layoutInfo).toMatchObject({ rightbarShown: true, rightbarTrack: true, rightbarFullscreen: true })
+  actions.openRightbar(false, true)
+  expect(store.getSnapshot().layoutInfo).toMatchObject({ rightbarShown: true, rightbarTrack: false, rightbarFullscreen: true })
+  actions.closeRightbar()
+  expect(store.getSnapshot().layoutInfo).toMatchObject({ rightbarShown: false, rightbarTrack: false, rightbarFullscreen: false })
+})
+
+it('keeps dragged px preferences across resize, close, and reopen', () => {
+  const { store, actions } = createLayoutStore().create()
+  actions.openRightbar(true, false)
+  actions.setRightbar(1100)
+  actions.setViewportWidth(800)
+  expect(store.getSnapshot().layoutInfo.rightbar).toBe(1100)
+  actions.closeRightbar()
+  actions.openRightbar(false, true)
+  expect(store.getSnapshot().layoutInfo.rightbar).toBe(1100)
+})
+
+it('clamps drag preferences to 300px and 70% of the current frame', () => {
+  const { store, actions } = createLayoutStore().create()
+  actions.setViewportWidth(1600)
+  actions.setRightbar(9999)
+  expect(store.getSnapshot().layoutInfo.rightbar).toBe(1120)
+  actions.setViewportWidth(1000)
+  actions.setRightbar(9999)
+  expect(store.getSnapshot().layoutInfo.rightbar).toBe(700)
+  actions.setRightbar(1)
+  expect(store.getSnapshot().layoutInfo.rightbar).toBe(300)
+})
+
+it('retains a minimum normal preference when first opened fullscreen on a phone', () => {
+  const { store, actions } = createLayoutStore().create()
+  actions.setViewportWidth(320)
+  actions.openRightbar(false, true)
+  expect(store.getSnapshot().layoutInfo.rightbar).toBe(300)
+})
+
+it('collapses a manually expanded narrow sidebar on opening, not presentation reports', () => {
+  const { store, actions } = createLayoutStore().create()
+  actions.setSidebar(400)
+  actions.setViewportWidth(800)
+  actions.toggleSidebar()
+  actions.openRightbar(true, false)
+  expect(store.getSnapshot().layoutInfo).toMatchObject({ sidebar: 400, narrowExpanded: false })
+  actions.toggleSidebar()
+  actions.openRightbar(true, true)
+  expect(store.getSnapshot().layoutInfo.narrowExpanded).toBe(true)
+  actions.closeRightbar()
+  actions.openRightbar(true, false)
+  expect(store.getSnapshot().layoutInfo.narrowExpanded).toBe(false)
+})
+
+it('keeps the wide sidebar preference and never opens a closed right panel on resize', () => {
+  const { store, actions } = createLayoutStore().create()
+  actions.setSidebar(420)
+  actions.openRightbar(true, false)
+  expect(store.getSnapshot().layoutInfo.sidebar).toBe(420)
+  actions.closeRightbar()
+  actions.setViewportWidth(3000)
+  expect(store.getSnapshot().layoutInfo).toMatchObject({ sidebar: 420, rightbarShown: false, rightbarTrack: false })
+})
 })
 
 describe('right panel instant geometry', () => {

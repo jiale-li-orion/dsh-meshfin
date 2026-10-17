@@ -391,6 +391,17 @@ export function apply(ctx: Context, config: Config = Config({})): void {
         activateView(sessionId, view)
         actions.openView(view, focus)
       }
+      // This seat holds the Session's store, so it is also what makes
+      // `ctx.conversation.requestView` addressable for a mounted Session.
+      const binding = sessions.binding(sessionId)
+      if (binding !== undefined) {
+        concreteConversation(ctx).bindViewSelection(binding, (view) => {
+          if (!viewTabs().some(tab => tab.id === view)) return false
+          activateView(sessionId, view)
+          actions.setView(view)
+          return true
+        })
+      }
       const inspectionTarget = () => uiConversation.views.entries().find(definition =>
         definition.toolCallFocus !== undefined
         && conversationViews.getSnapshot().some(view => view.id === definition.target),
@@ -458,6 +469,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
       'conversation.input.model': { kind: 'single', scope: 'session' },
       'conversation.input.activity': { kind: 'single', scope: 'session' },
       'conversation.composer.dock': { kind: 'list', scope: 'session' },
+      'conversation.context.meter.action': { kind: 'list', scope: 'session' },
     },
     inject: (sessionId: SessionId | undefined): ComposerBarInjected => {
       if (sessionId === undefined) {

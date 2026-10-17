@@ -1812,7 +1812,7 @@ describe('command launcher chrome and control seats', () => {
       'conversation.input.overlay', 'conversation.input.attachments',
       'conversation.input.permission', 'conversation.input.plan', 'conversation.input.left',
       'conversation.input.right', 'conversation.input.model', 'conversation.input.activity',
-      'conversation.composer.dock',
+      'conversation.composer.dock', 'conversation.context.meter.action',
     ])
     expect(view.queryByLabelText('Plan mode')).toBeNull()
     expect(view.queryByLabelText('Model')).toBeNull()

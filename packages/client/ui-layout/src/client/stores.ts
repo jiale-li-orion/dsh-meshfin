@@ -6,7 +6,8 @@ import { defineStore, type EngineStoreHandle } from '@deepseek-ai/dsh-client-sto
 import type { MainPanelId } from './service.ts'
 import {
   clampWidth, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN,
-  SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN,
+  SIDEBAR_AUTO_COLLAPSE, SIDEBAR_DEFAULT, SIDEBAR_MAX, SIDEBAR_MIN, SINGLE_PANEL_MAX,
+  type SinglePanelPage,
 } from './columns.ts'
 
 /**
@@ -18,6 +19,12 @@ type LayoutState = {
     /** Null selects the Conversation; global panels keep the current Session intact. */
     activePanelId: MainPanelId | null
   }
+  /**
+   * Which column a frame below {@link SINGLE_PANEL_MAX} shows. A narrow frame is
+   * one column at a time, so this is navigation rather than geometry, and it is
+   * this client's own: a wide frame has no pages and keeps the main page.
+   */
+  page: SinglePanelPage
   layoutInfo: LayoutInfo
 }
 
@@ -61,6 +68,7 @@ type LayoutActions = {
   setSidebar: (draft: LayoutState, px: number) => void
   toggleSidebar: (draft: LayoutState) => void
   setViewportWidth: (draft: LayoutState, width: number) => void
+  setPage: (draft: LayoutState, page: SinglePanelPage) => void
   setRightbar: (draft: LayoutState, px: number) => void
   openRightbar: (draft: LayoutState, track: boolean, fullscreen: boolean) => void
   closeRightbar: (draft: LayoutState) => void
@@ -72,13 +80,16 @@ type LayoutActions = {
  * default. The right panel initializes at 45% of the frame on first opening
  * and keeps that px preference across resizes and close. Drag writes clamp to
  * the current frame's range. Narrow sidebar toggles change only the expansion
- * override; opening the right panel clears that override.
+ * override; opening the right panel clears that override. A frame below
+ * {@link SINGLE_PANEL_MAX} shows one page instead, and the sidebar toggle
+ * becomes the switch that hosts that column.
  * @returns the store handle (spec + type + identity + factory in one).
  */
 export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutActions>  {
   const handle = defineStore({
     init: (): LayoutState => ({
       panelInfo: { activePanelId: null },
+      page: 'main',
       layoutInfo: {
         sidebar: SIDEBAR_DEFAULT,
         viewportWidth: window.innerWidth,
@@ -104,10 +115,13 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         d.layoutInfo.sidebar = clampWidth(px, SIDEBAR_MIN, SIDEBAR_MAX)
       },
       // Narrow toggles flip only the override: the width preference survives
-      // untouched, so re-widening restores the pre-squeeze layout.
+      // untouched, so re-widening restores the pre-squeeze layout. Below the
+      // single-panel breakpoint there is no rail to collapse into, so the same
+      // gesture switches the page that hosts the column instead.
       toggleSidebar: (d) => {
         d.layoutInfo.rightbarInstant = false
-        if (d.layoutInfo.viewportWidth < SIDEBAR_AUTO_COLLAPSE) d.layoutInfo.narrowExpanded = !d.layoutInfo.narrowExpanded
+        if (d.layoutInfo.viewportWidth < SINGLE_PANEL_MAX) d.page = d.page === 'nav' ? 'main' : 'nav'
+        else if (d.layoutInfo.viewportWidth < SIDEBAR_AUTO_COLLAPSE) d.layoutInfo.narrowExpanded = !d.layoutInfo.narrowExpanded
         else d.layoutInfo.sidebar = d.layoutInfo.sidebar === 0 ? SIDEBAR_DEFAULT : 0
       },
       // Crossing the breakpoint in either direction drops the override: the
@@ -118,8 +132,13 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
         if ((d.layoutInfo.viewportWidth < SIDEBAR_AUTO_COLLAPSE) !== (width < SIDEBAR_AUTO_COLLAPSE)) {
           d.layoutInfo.narrowExpanded = false
         }
+        // A page is a single-panel idea: crossing that breakpoint either way
+        // returns to the main page, so no page can outlive the frame that shows
+        // it and a wide frame never holds one nothing renders.
+        if ((d.layoutInfo.viewportWidth < SINGLE_PANEL_MAX) !== (width < SINGLE_PANEL_MAX)) d.page = 'main'
         d.layoutInfo.viewportWidth = width
       },
+      setPage: (d, page: SinglePanelPage) => { d.page = page },
       setRightbar: (d, px: number) => {
         d.layoutInfo.rightbarInstant = false
         d.layoutInfo.rightbar = clampWidth(px, RIGHTBAR_MIN, Math.max(RIGHTBAR_MIN, d.layoutInfo.viewportWidth * RIGHTBAR_MAX_RATIO))
@@ -129,6 +148,10 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
           d.layoutInfo.rightbarInstant = d.layoutInfo.rightbarFullscreen && !fullscreen
         }
         if (!d.layoutInfo.rightbarShown && d.layoutInfo.viewportWidth < SIDEBAR_AUTO_COLLAPSE) d.layoutInfo.narrowExpanded = false
+        // Below the breakpoint a shown right panel covers the frame on its own
+        // terms, so the page follows that first opening; the page bar would
+        // otherwise name a column the reader cannot see.
+        if (!d.layoutInfo.rightbarShown && d.layoutInfo.viewportWidth < SINGLE_PANEL_MAX) d.page = 'right'
         d.layoutInfo.rightbar ??= Math.max(RIGHTBAR_MIN, Math.round(d.layoutInfo.viewportWidth * RIGHTBAR_DEFAULT_RATIO))
         d.layoutInfo.rightbarShown = true
         d.layoutInfo.rightbarTrack = track
@@ -136,6 +159,8 @@ export function createLayoutStore(): EngineStoreHandle<LayoutState, LayoutAction
       },
       closeRightbar: (d) => {
         if (d.layoutInfo.rightbarShown) d.layoutInfo.rightbarInstant = d.layoutInfo.rightbarFullscreen
+        // The right page has nothing to show once its occupant stops drawing.
+        if (d.page === 'right') d.page = 'main'
         d.layoutInfo.rightbarShown = false
         d.layoutInfo.rightbarTrack = false
         d.layoutInfo.rightbarFullscreen = false

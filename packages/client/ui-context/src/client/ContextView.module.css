@@ -1,0 +1,334 @@
+.root {
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 36%);
+  width: 100%;
+  min-height: 0;
+  height: 100%;
+  background: var(--dsw-alias-bg-base);
+}
+
+.main {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.root:not(:has(> aside)) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px 14px;
+  border-bottom: 1px solid var(--dsw-alias-border-l3);
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.titleLine h1 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 26px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.subtitle {
+  margin: 3px 0 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px 22px;
+  border-bottom: 1px solid var(--dsw-alias-border-l3);
+}
+
+.metric {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.metric span,
+.metric strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric span {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.metric strong {
+  margin-top: 2px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 14px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+.error,
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 10px 22px 0;
+  padding: 9px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.error {
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.notice {
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.centerStatus {
+  display: grid;
+  place-items: center;
+  flex: 1;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.list {
+  flex: 1;
+  min-height: 0;
+  padding: 8px 14px 78px;
+  overflow: auto;
+}
+
+.virtualSpace {
+  position: relative;
+  width: 100%;
+}
+
+.loadEarlier {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
+}
+
+.virtualRow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 3px 0;
+}
+
+.unit {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.unit:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.unitSelected {
+  border-color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-interactive-bg-active);
+}
+
+.unitSelect,
+.selectionToggle,
+.rowAction {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.selectionToggle {
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.selectionMark {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 5px;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary-inverted);
+}
+
+.selectionToggle:hover .selectionMark {
+  border-color: var(--dsw-alias-state-business-primary);
+}
+
+.selectionToggleSelected .selectionMark {
+  border-color: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-state-business-primary);
+}
+
+.unitSelect {
+  min-width: 0;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.unitTopline {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 7px;
+  font-size: 11px;
+  line-height: 16px;
+}
+
+.role {
+  font-weight: 600;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.kind {
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.seq,
+.tokens {
+  color: var(--dsw-alias-label-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.tokens {
+  margin-left: auto;
+}
+
+.preview {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unitActions {
+  display: flex;
+}
+
+.rowAction {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  border-left: 1px solid var(--dsw-alias-border-l3);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.rowAction:hover:not(:disabled) {
+  color: var(--dsw-alias-label-primary);
+}
+
+.rowAction:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.unitSelect:focus-visible,
+.selectionToggle:focus-visible,
+.rowAction:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -2px;
+}
+
+.selectionBar {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  left: 16px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px 9px 14px;
+  border: 1px solid var(--dsw-alias-border-inverted);
+  border-radius: 12px;
+  background: var(--dsw-specific-menu);
+  box-shadow: var(--dsw-shadow-lv2);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.selectionActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+@media (max-width: 900px) {
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 840px) {
+  .root {
+    display: block;
+  }
+}
+
+@media (max-width: 560px) {
+  .header,
+  .metrics {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .selectionBar {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

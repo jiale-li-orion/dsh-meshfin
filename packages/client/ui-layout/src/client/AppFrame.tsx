@@ -7,6 +7,13 @@
  * the Conversation or a global panel. Each column occupant owns its Session
  * binding and reports the geometry it needs.
  *
+ * Below `SINGLE_PANEL_MAX` the frame shows one page at a time instead of
+ * solving three columns: the page's column takes the width, the other two hold
+ * zero-width cells so their occupants stay mounted (a page switch costs no
+ * column state), and a bar in the bottom row switches between them. The right
+ * page adds no presentation of its own: the right column's occupant already
+ * covers a narrow frame, and the frame only steps its own two columns aside.
+ *
  * The right column is a track, not a box: its occupant draws its panel anchored
  * to the frame's right edge at the resolved normal width, and the
  * track only decides whether the centre makes room for it. The occupant reports
@@ -19,21 +26,33 @@ import type { ReactNode } from 'react'
 import type {
   PropsLocale, PropsRenderSlots, PropsRuntime, PropsStore,
 } from '@deepseek-ai/dsh-client-ui-slots'
-import { CENTER_MIN, clampWidth, computeColumns, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT } from './columns.ts'
+import { CENTER_MIN, clampWidth, computeColumns, computeSinglePanel, RIGHTBAR_DEFAULT_RATIO, RIGHTBAR_MAX_RATIO, RIGHTBAR_MIN, SIDEBAR_AUTO_COLLAPSE, SIDEBAR_COLLAPSED, SIDEBAR_DEFAULT, SINGLE_PANEL_MAX } from './columns.ts'
 import { DocumentTitle } from './DocumentTitle.tsx'
+import { PageBar } from './PageBar.tsx'
 import type { createLayoutStore } from './stores.ts'
 import css from './AppFrame.module.css'
 
-/** Full composed props: runtime share + child-slot render share + store share. */
+/** Full composed props: runtime share + child-slot render share + store share + the frame's own copy. */
 export type AppFrameProps =
   & PropsRuntime<'root'>
   & PropsRenderSlots<'sidebar' | 'main' | 'rightbar' | 'shell.bottom' | 'shell.overlay' | 'shell.leading'>
   & PropsStore<ReturnType<typeof createLayoutStore>>
-  & PropsLocale<'common'>
+  & PropsLocale<'layout'>
 
 /** Center column grid item (session-body building block). */
 function CenterColumn(props: { children?: ReactNode }) {
   return <div className={css.centerCol}>{props.children}</div>
+}
+
+/**
+ * Grid track of one single-panel column: the page's column takes the frame, the
+ * other two collapse. Growing tracks stay fractional so a viewport change lands
+ * in the same layout pass as the frame edge, like the three-column template.
+ * @param px - resolved width of that column, 0 when it is not the page.
+ * @returns the CSS track size.
+ */
+function singleTrack(px: number): string {
+  return px === 0 ? '0px' : '1fr'
 }
 
 /** Subscribe to the main key without subscribing the column frame to each panel id. */
@@ -127,6 +146,7 @@ export function AppFrame({
   t,
 }: AppFrameProps) {
   const layoutInfo = useStore(state => state.layoutInfo)
+  const page = useStore(state => state.page)
   const frameRef = useRef<HTMLDivElement | null>(null)
   const viewport = layoutInfo.viewportWidth
 
@@ -158,7 +178,11 @@ export function AppFrame({
   }, [actions])
 
   const narrow = viewport < SIDEBAR_AUTO_COLLAPSE
-  const sidebarCollapsed = narrow ? !layoutInfo.narrowExpanded : layoutInfo.sidebar === 0
+  // Below the single-panel breakpoint the frame is one column at a time, and
+  // that page — not the auto-collapse override — decides whether the sidebar is
+  // expanded: the nav page draws it at the frame width, never as the 56px rail.
+  const single = viewport < SINGLE_PANEL_MAX
+  const sidebarCollapsed = single ? page !== 'nav' : narrow ? !layoutInfo.narrowExpanded : layoutInfo.sidebar === 0
   const sidebarPreference = sidebarCollapsed
     ? 0
     : layoutInfo.sidebar === 0 ? SIDEBAR_DEFAULT : layoutInfo.sidebar
@@ -171,7 +195,9 @@ export function AppFrame({
   // Opening on a narrow frame collapses the left sidebar. Eligibility must
   // include that space before the occupant's first shown report arrives.
   const normal = computeColumns(viewport, !layoutInfo.rightbarShown && narrow ? 0 : sidebarPreference, rightbarPreference, collapsedWidth)
-  const cols = computeColumns(viewport, sidebarPreference, layoutInfo.rightbarTrack ? rightbarPreference : 0, collapsedWidth)
+  const cols = single
+    ? computeSinglePanel(page, viewport)
+    : computeColumns(viewport, sidebarPreference, layoutInfo.rightbarTrack ? rightbarPreference : 0, collapsedWidth)
   const colsRef = useRef(cols)
   colsRef.current = cols
   const rightbarWidth = useRef(normal.rightbar)
@@ -202,9 +228,11 @@ export function AppFrame({
     previousViewport.current = viewport
     if (previousToggle.current === trackToggle) return
     previousToggle.current = trackToggle
-    if (viewportChanged) return
+    // A single-panel frame's tracks ARE the page: switching pages replaces one
+    // column with another instead of resizing one, so there is nothing to ease.
+    if (viewportChanged || single) return
     setAnimating(token => token + 1)
-  }, [trackToggle, viewport])
+  }, [trackToggle, viewport, single])
   useEffect(() => {
     if (animating === 0) return
     const frame = frameRef.current
@@ -239,6 +267,9 @@ export function AppFrame({
   // whole and was corrected two frames later — visible jitter. cols keeps only
   // the discrete decisions (track present, collapse state) and the drag base.
   const rightbarMax = cols.rightbar === 0 ? 0 : clampWidth(rightbarPreference, RIGHTBAR_MIN, viewport * RIGHTBAR_MAX_RATIO)
+  const gridTemplateColumns = single
+    ? `${singleTrack(cols.sidebar)} ${singleTrack(cols.center)} ${singleTrack(cols.rightbar)}`
+    : `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`
   const sidebar = useMemo(() => renderSlot('sidebar', {
     collapsed: sidebarCollapsed,
     width: cols.sidebar,
@@ -254,6 +285,12 @@ export function AppFrame({
   // --dsh-frame-leading-clearance under the same collapsed condition.
   const leading = useMemo(() => renderSlot('shell.leading', {}), [renderSlot])
   const leadingMounted = darwin && sidebarCollapsed
+  // The right page gives the column the whole frame; every other page keeps the
+  // occupant's normal eligibility, which is what its own narrow fullscreen
+  // presentation already overrides.
+  const rightbarOwner = page === 'right'
+    ? { width: viewport, viewportWidth: viewport, canShow: true }
+    : { width: normal.rightbar, viewportWidth: viewport, canShow: normal.rightbar > 0 }
 
   return (
     <div
@@ -262,9 +299,10 @@ export function AppFrame({
       style={{
         ...(document.documentElement.hasAttribute('data-windows-titlebar')
           ? { '--dsh-windows-sidebar-width': `${cols.sidebar}px` } : {}),
-        gridTemplateColumns:
-          `${cols.sidebar}px minmax(${cols.rightbar === 0 ? 0 : CENTER_MIN}px, 1fr) minmax(0px, ${rightbarMax}px)`,
+        gridTemplateColumns,
       }}
+      data-single-panel={single || undefined}
+      data-page={single ? page : undefined}
       data-sidebar-collapsed={sidebarCollapsed || undefined}
       data-rightbar-collapsed={cols.rightbar === 0 || undefined}
       data-rightbar-fullscreen={layoutInfo.rightbarFullscreen || undefined}
@@ -283,10 +321,13 @@ export function AppFrame({
       <>
         <CenterColumn>{main}</CenterColumn>
         <RightbarColumn>
-          {renderSlot('rightbar', { width: normal.rightbar, viewportWidth: viewport, canShow: normal.rightbar > 0 })}
+          {renderSlot('rightbar', rightbarOwner)}
         </RightbarColumn>
       </>
       <div className={css.bottomRow} data-shell-bottom>
+        {single && (
+          <PageBar page={page} rightShown={layoutInfo.rightbarShown} onSelect={actions.setPage} t={t} />
+        )}
         {renderSlot('shell.bottom', {})}
       </div>
       <div className={css.overlayLayer} data-shell-overlay>
@@ -297,9 +338,10 @@ export function AppFrame({
           {leading}
         </div>
       )}
-      {/* The collapsed rail is fixed-width: no resize handle while closed. */}
-      {!sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
-      {layoutInfo.rightbarShown && !layoutInfo.rightbarFullscreen && normal.rightbar > 0 && (
+      {/* The collapsed rail is fixed-width and a single-panel column is the
+          whole frame: neither offers a column edge to drag. */}
+      {!single && !sidebarCollapsed && <DragHandle side="sidebar" left={cols.sidebar} onStart={onSidebarStart} onDrag={onSidebarDrag} onEnd={onDragEnd} />}
+      {!single && layoutInfo.rightbarShown && !layoutInfo.rightbarFullscreen && normal.rightbar > 0 && (
         <DragHandle side="rightbar" left={viewport - normal.rightbar} onStart={onRightbarStart} onDrag={onRightbarDrag} onEnd={onDragEnd} />
       )}
     </div>

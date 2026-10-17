@@ -1,0 +1,37 @@
+/*
+ * The single-panel page bar: one row of page switches at the bottom of a frame
+ * that shows one column at a time. Tokens only; the bar inherits the bottom
+ * row's grounding so it reads as chrome, not as a card.
+ */
+
+.bar {
+  display: flex;
+  gap: 4px;
+  padding: 6px 8px;
+  border-top: 0.5px solid var(--dsw-alias-border-l3);
+}
+
+.page {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 8px;
+  overflow: hidden;
+  font: inherit;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  color: var(--dsw-alias-label-secondary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  cursor: pointer;
+}
+
+.page:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.page[aria-current='page'] {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-active);
+}

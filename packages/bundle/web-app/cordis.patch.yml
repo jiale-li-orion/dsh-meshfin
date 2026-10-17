@@ -332,6 +332,11 @@
     - id: ui-chat
       name: '@deepseek-ai/dsh-client-ui-chat'
 
+    # Exact current model surface, rewrite, and range-preparation review as one
+    # Conversation View, plus the marker row a committed rewrite leaves in Chat.
+    - id: ui-context
+      name: '@deepseek-ai/dsh-client-ui-context'
+
     # Official occupants for the generic sidebar and conversation brand slots.
     - id: ui-brand-official
       name: '@deepseek-ai/dsh-client-ui-brand-official'

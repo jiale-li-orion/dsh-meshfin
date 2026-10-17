@@ -14,7 +14,7 @@ import { randomUUID } from '@deepseek-ai/dsh-util-crypto'
 // error, so scope resolution goes through the sessions service (scopeOf
 // method) instead of the standalone helper.
 import type {
-  ISessions, PendingSubmissionRetirement, SessionFace,
+  ISessions, PendingSubmissionRetirement, SessionBinding, SessionFace,
 } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-file-upload/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -68,6 +68,15 @@ export interface IConversation {
    * @returns completion of the page pull.
    */
   loadOlder(): Promise<void>
+  /**
+   * Select one registered Conversation View for the scoped session, writing the
+   * same per-Session selection the header's View strip writes.
+   * @param view - a `conversation.view` entry id registered by any plugin.
+   * @throws when the caller has no Session scope, the Session's Conversation is
+   * not mounted (its store is only reachable from that seat), or the View is not
+   * registered.
+   */
+  requestView(view: string): void
 }
 
 /** Create one browser-only image draft descriptor; only its id enters input state. */
@@ -169,6 +178,12 @@ export class ConversationController extends Service implements IConversation {
   }> = []
   private activeFileUploads = 0
   private readonly maxConcurrentFileUploads: number
+  /**
+   * Views each mounted Session can select, installed by the shell registration
+   * that owns the Session's store. Keys are Session binding objects, so a
+   * replaced Session generation drops its selector with the binding itself.
+   */
+  private readonly viewSelections = new WeakMap<SessionBinding, (view: string) => boolean>()
 
   /**
    * @param ctx - owning root context (the plugin apply context; the service
@@ -507,6 +522,30 @@ export class ConversationController extends Service implements IConversation {
   /** Pull one older history page for the scoped Session. */
   async loadOlder(): Promise<void> {
     await this.scopedSession('loadOlder').loadOlder()
+  }
+
+  /**
+   * Install or replace the View selector for one mounted Session. The shell
+   * registration owns the per-Session store, so only its inject face can name a
+   * View; this is that face's channel into the service contract. Replacements
+   * are idempotent because the inject face runs once per Session binding.
+   * @param binding - the Session binding whose store backs the selection.
+   * @param select - selector returning whether the View id is registered.
+   */
+  bindViewSelection(binding: SessionBinding, select: (view: string) => boolean): void {
+    this.viewSelections.set(binding, select)
+  }
+
+  /** Select one registered View for the scoped Session. */
+  requestView(view: string): void {
+    const sessionId = this.scopeId('requestView')
+    const binding = this.requireSessions().binding(sessionId)
+    if (binding === undefined) throw new Error(`conversation.requestView: session "${sessionId}" resolved no binding`)
+    const select = this.viewSelections.get(binding)
+    if (select === undefined) {
+      throw new Error(`conversation.requestView: session "${sessionId}" has no mounted Conversation`)
+    }
+    if (!select(view)) throw new Error(`conversation.requestView: no Conversation View "${view}" is registered`)
   }
 
   /** Resolve the caller scope's session face or throw on root contexts. */

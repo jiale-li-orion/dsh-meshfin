@@ -282,6 +282,8 @@
       "@deepseek-ai/dsh-client-ui-chat/client": ["./packages/client/ui-chat/src/client/index.ts"],
       "@deepseek-ai/dsh-client-ui-conversation": ["./packages/client/ui-conversation/src"],
       "@deepseek-ai/dsh-client-ui-conversation/client": ["./packages/client/ui-conversation/src/client/index.ts"],
+      "@deepseek-ai/dsh-client-ui-context": ["./packages/client/ui-context/src"],
+      "@deepseek-ai/dsh-client-ui-context/client": ["./packages/client/ui-context/src/client/index.ts"],
       "@deepseek-ai/dsh-client-ui-tool": ["./packages/client/ui-tool/src"],
       "@deepseek-ai/dsh-tool-present/types": ["./packages/deliverables/tool-present/src/types.ts"],
       "@deepseek-ai/dsh-workspace-changes/types": ["./packages/deliverables/workspace-changes/src/types.ts"],
@@ -372,6 +374,8 @@
       "@deepseek-ai/dsh-session-context/brand": ["./packages/session/session-context/src/brand.ts"],
       "@deepseek-ai/dsh-tool-session-context": ["./packages/session/tool-session-context/src/index.ts"],
       "@deepseek-ai/dsh-workbench-bytes": ["./packages/workbench/workbench-bytes/src/index.ts"],
+      "@deepseek-ai/dsh-client-ui-workbench": ["./packages/client/ui-workbench/src"],
+      "@deepseek-ai/dsh-client-ui-workbench/client": ["./packages/client/ui-workbench/src/client/index.ts"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp-app": ["./packages/bundle/acp-app/src"],

@@ -243,6 +243,19 @@
   transition: none;
 }
 
+/* Below the single-panel breakpoint the frame is one page: the page's column
+   takes the width (the TSX sizes the tracks) and the two others keep their
+   cells without painting. Their occupants stay mounted, so a page switch costs
+   no column state, and the right column is never hidden here — a shown panel
+   already covers the frame with its own presentation, including the slide that
+   brings it in and out. */
+.frame[data-single-panel][data-page='main'] > .sidebarCol,
+.frame[data-single-panel][data-page='nav'] > .centerCol,
+.frame[data-single-panel][data-page='right'] > .sidebarCol,
+.frame[data-single-panel][data-page='right'] > .centerCol {
+  visibility: hidden;
+}
+
 /* Fullscreen covers the frame while its underlying columns enter or exit. */
 .frame[data-rightbar-fullscreen],
 .frame[data-rightbar-fullscreen] .handle,

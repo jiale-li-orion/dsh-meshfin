@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Context view",
+    "description": "Inspect the exact current model context, rewrite one unit in place, and review range preparations before committing."
+  }
+}

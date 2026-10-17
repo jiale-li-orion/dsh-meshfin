@@ -1,0 +1,23 @@
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 8px 0;
+  padding: 9px 12px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: 9px;
+  background: var(--dsw-alias-bg-layer-1);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.root strong,
+.root span {
+  display: block;
+}
+
+.root strong {
+  color: var(--dsw-alias-label-primary);
+}

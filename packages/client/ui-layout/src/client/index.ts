@@ -18,7 +18,9 @@ import { AppFrame } from './AppFrame.tsx'
 import { createLayoutStore } from './stores.ts'
 import { LayoutController } from './service.ts'
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
+// Two dictionaries: command labels for `shortcuts.layout`, frame copy for `layout`.
 import { en, zh } from './shortcut-locales.ts'
+import { en as frameEn, zh as frameZh } from './locales.ts'
 import { ThemePresenter } from './theme-presenter.ts'
 
 // Contract exports only (export-convergence rule: cross-package consumers
@@ -158,6 +160,9 @@ export const inject = ['slots', 'theme', 'locale', 'shortcuts']
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register('shortcuts.layout', { zh, en }), 'layout: command labels')
   const t = ctx.locale.bind('shortcuts.layout')
+  // The frame's own copy (the single-panel page bar); the root entry binds it
+  // and still reaches the shared `common` vocabulary through the lookup chain.
+  ctx.effect(() => ctx.locale.register('layout', { zh: frameZh, en: frameEn }), 'layout: frame copy')
 
   ctx.effect(() => {
     const handle = createLayoutStore()
@@ -177,7 +182,7 @@ export function apply(ctx: ClientContext): void {
     const disposeService = ctx.reflect.provide('layout', layout)
     const disposeRegistration = ctx.slots.register({
       name: 'root',
-      locale: 'common',
+      locale: 'layout',
       children: {
         'sidebar': { kind: 'single', scope: 'root' },
         'main': { kind: 'keyed', scope: 'root' },

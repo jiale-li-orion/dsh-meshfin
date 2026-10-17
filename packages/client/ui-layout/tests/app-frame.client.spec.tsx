@@ -7,6 +7,7 @@ import { act, cleanup, render } from '@testing-library/react'
 import { AppFrame } from '../src/client/AppFrame.tsx'
 import type { AppFrameProps } from '../src/client/AppFrame.tsx'
 import type { MainPanelId, RightbarOwnerProps, SidebarOwnerProps } from '../src/client/index.ts'
+import { en } from '../src/client/locales.ts'
 import { createLayoutStore } from '../src/client/stores.ts'
 import type { WorkspaceSnapshot } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -18,6 +19,14 @@ let workspacesReady = true
 type AttentionSnapshot = Parameters<Parameters<AppFrameProps['useSessionStatus']>[0]>[0]
 const noAttention: AttentionSnapshot = new Map()
 const useSessionStatus: AppFrameProps['useSessionStatus'] = selector => selector(noAttention)
+
+/* The fixture translate seat: the shipped frame dictionary plus the product
+   title the locale plugin owns, so specs assert the copy a reader sees. */
+const copy = ((): AppFrameProps['t'] => {
+  const dictionary = new Map<string, string>(Object.entries(en))
+  dictionary.set('brand.localBuild', 'DSH Local Build')
+  return key => dictionary.get(key) ?? key
+})()
 
 let observers: ResizeObserverStub[]
 class ResizeObserverStub {
@@ -100,7 +109,7 @@ function mountFrame(windowWidth = frameWidth) {
       useResource={useResource}
       useWorkspaces={sel => sel(workspaceState)}
       {...allowAllAccess}
-      t={key => key === 'brand.localBuild' ? 'DSH Local Build' : key}
+      t={copy}
     />
   )
   const utils = render(element())
@@ -128,6 +137,12 @@ function handleFor(frame: HTMLElement, side: 'sidebar' | 'rightbar'): HTMLElemen
   const handle = frame.querySelector<HTMLElement>(`[data-side="${side}"]`)
   if (handle === null) throw new Error(`missing ${side} resize handle`)
   return handle
+}
+
+/* A single-panel frame names one page per template: that page's track grows and
+   the other two collapse to nothing. */
+function pageTracks(frame: HTMLElement): string[] {
+  return frame.style.gridTemplateColumns.split(' ')
 }
 
 function pointer(handle: Element, type: string, clientX: number, pointerId = 1, button = 0): void {
@@ -318,7 +333,7 @@ describe('AppFrame normal width concessions', () => {
     expect(frame.querySelector('[data-side="rightbar"]')).toBeNull()
     expect(instance.getSnapshot().layoutInfo).toMatchObject({ rightbarShown: true, rightbar: 864 })
     act(() => { instance.actions.closeRightbar() })
-    resize(455)
+    resize(780)
     expect(tracks(frame)).toEqual([56, 0])
     resize(1920)
     expect(tracks(frame)).toEqual([420, 0])
@@ -374,6 +389,84 @@ describe('AppFrame normal width concessions', () => {
     act(() => { instance.actions.toggleSidebar() })
     expect(tracks(frame)[0]).toBe(280)
     expect(instance.getSnapshot().layoutInfo.sidebar).toBe(0)
+  })
+})
+
+describe('AppFrame single-panel pages', () => {
+  it('shows only the main column below the breakpoint, with the page bar beside the bottom slot', () => {
+    frameWidth = 390
+    const { frame, getByTestId } = mountFrame()
+    expect(frame.dataset.singlePanel).toBe('true')
+    expect(frame.dataset.page).toBe('main')
+    expect(pageTracks(frame)).toEqual(['0px', '1fr', '0px'])
+    // Every column stays mounted, so switching pages costs no column state.
+    expect(getByTestId('sidebar-content')).toBeTruthy()
+    expect(getByTestId('main-content')).toBeTruthy()
+    expect(getByTestId('rightbar-content')).toBeTruthy()
+    const bottom = frame.querySelector<HTMLElement>('[data-shell-bottom]')!
+    expect(bottom.querySelector('[data-page-bar]')).not.toBeNull()
+    expect(bottom.querySelector('[data-testid="shell.bottom-content"]')).not.toBeNull()
+  })
+
+  it('switches pages through its localized controls and marks the current one', () => {
+    frameWidth = 390
+    const { frame, instance, sidebarOwner, getByRole } = mountFrame()
+    expect(getByRole('navigation', { name: en['page.label'] })).toBeTruthy()
+    act(() => { getByRole('button', { name: en['page.nav'] }).click() })
+    expect(frame.dataset.page).toBe('nav')
+    expect(pageTracks(frame)).toEqual(['1fr', '0px', '0px'])
+    // The nav page renders the occupant expanded at the frame width, never the rail.
+    expect(sidebarOwner()).toEqual({ collapsed: false, width: 390 })
+    expect(frame.dataset.sidebarCollapsed).toBeUndefined()
+    expect(getByRole('button', { name: en['page.nav'] }).getAttribute('aria-current')).toBe('page')
+    expect(getByRole('button', { name: en['page.main'] }).getAttribute('aria-current')).toBeNull()
+    act(() => { getByRole('button', { name: en['page.main'] }).click() })
+    expect(frame.dataset.page).toBe('main')
+    expect(instance.getSnapshot().page).toBe('main')
+    expect(getByRole('button', { name: en['page.main'] }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('offers the right page only while the right panel is shown', () => {
+    frameWidth = 390
+    const { frame, instance, rightOwner, getByRole, queryByRole } = mountFrame()
+    expect(queryByRole('button', { name: en['page.right'] })).toBeNull()
+    act(() => { instance.actions.openRightbar(false, true) })
+    // The panel's own narrow presentation owns the surface; the frame only
+    // hands it the whole width and steps its own two columns aside.
+    expect(frame.dataset.page).toBe('right')
+    expect(pageTracks(frame)).toEqual(['0px', '0px', '1fr'])
+    expect(rightOwner()).toEqual({ width: 390, viewportWidth: 390, canShow: true })
+    expect(getByRole('button', { name: en['page.right'] }).getAttribute('aria-current')).toBe('page')
+    act(() => { instance.actions.closeRightbar() })
+    expect(queryByRole('button', { name: en['page.right'] })).toBeNull()
+    expect(frame.dataset.page).toBe('main')
+  })
+
+  it.each([['nav'], ['right']] as const)('never offers a column edge to drag on the %s page', (page) => {
+    frameWidth = 390
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.openRightbar(false, true); instance.actions.setPage(page) })
+    expect(frame.querySelectorAll('[data-side]')).toHaveLength(0)
+    expect(pageTracks(frame)).toEqual(page === 'nav' ? ['1fr', '0px', '0px'] : ['0px', '0px', '1fr'])
+  })
+
+  it('returns to the three-column frame and the main page when it widens', () => {
+    frameWidth = 390
+    const { frame, instance } = mountFrame()
+    act(() => { instance.actions.setPage('nav') })
+    resize(1920)
+    expect(frame.dataset.singlePanel).toBeUndefined()
+    expect(frame.hasAttribute('data-page')).toBe(false)
+    expect(instance.getSnapshot().page).toBe('main')
+    expect(tracks(frame)).toEqual([280, 0])
+    expect(frame.querySelector('[data-page-bar]')).toBeNull()
+  })
+
+  it('keeps the three-column frame and no page bar above the breakpoint', () => {
+    const { frame } = mountFrame()
+    expect(frame.dataset.singlePanel).toBeUndefined()
+    expect(frame.querySelector('[data-page-bar]')).toBeNull()
+    expect(tracks(frame)).toEqual([280, 0])
   })
 })
 
@@ -505,13 +598,16 @@ describe('AppFrame right panel presentation', () => {
     expect(frame.dataset.rightbarFullscreen).toBeUndefined()
   })
 
-  it('retains fullscreen without a track when normal columns cannot fit', () => {
+  it('retains the right page without a track when the columns cannot fit', () => {
     frameWidth = 700
     const { frame, instance, rightOwner } = mountFrame()
     act(() => { instance.actions.openRightbar(false, true) })
-    expect(tracks(frame)).toEqual([56, 0])
-    expect(rightOwner()).toEqual({ width: 0, viewportWidth: 700, canShow: false })
+    // Below the breakpoint the frame is one page, and the right panel's own
+    // fullscreen presentation is that page's whole content.
+    expect(pageTracks(frame)).toEqual(['0px', '0px', '1fr'])
+    expect(rightOwner()).toEqual({ width: 700, viewportWidth: 700, canShow: true })
     expect(instance.getSnapshot().layoutInfo.rightbarShown).toBe(true)
+    expect(frame.dataset.rightbarCollapsed).toBeUndefined()
     expect(frame.querySelector('[data-side="rightbar"]')).toBeNull()
   })
 

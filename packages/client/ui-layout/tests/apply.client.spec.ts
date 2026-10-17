@@ -11,6 +11,7 @@ import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply as themeApply, inject as themeInject, ThemeRuntime } from '@deepseek-ai/dsh-client-ui-theme/client'
 import { apply, inject, LayoutController } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { apply as nodeApply } from '@deepseek-ai/dsh-client-ui-layout'
+import { en } from '../src/client/locales.ts'
 import type { MainPanelId } from '../src/client/service.ts'
 import type { createLayoutStore } from '../src/client/stores.ts'
 
@@ -122,6 +123,21 @@ describe('ui-layout client apply', () => {
     const pending = layout.beginNavigation()
     await fiber.dispose()
     expect(pending.aborted).toBe(true)
+  })
+
+  it('binds the root entry to its own copy and registers that dictionary', async () => {
+    const { ctx, slots } = await bench()
+    const fiber = ctx.plugin({ inject: [...inject], apply })
+    await fiber.await()
+    const locale = ctx.get('locale') as LocaleRuntime
+    const t = locale.bind('layout')
+    expect(t('page.nav')).toBe(en['page.nav'])
+    // The declared namespace still reaches the shared vocabulary (the product
+    // title), because the lookup chain consults `common` after the miss.
+    expect(locale.bind('common')('brand.localBuild')).toBe(locale.bind('layout')('brand.localBuild'))
+    expect(slots.entries('root')[0]!.locale).toBe('layout')
+    await fiber.dispose()
+    expect(t('page.nav')).toBe('page.nav')
   })
 
   it('theme presenter applies the initial snapshot, follows theme/change, and unwinds on dispose', async () => {

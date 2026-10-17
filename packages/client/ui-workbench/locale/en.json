@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "ui-workbench",
+    "description": "Shared workbench view as a right-Sidebar tab, with a byte-route file preview"
+  }
+}

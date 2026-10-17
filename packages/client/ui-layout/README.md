@@ -33,6 +33,8 @@ Global panels occupy the root-scoped `main` keyed slot; `conversation` is the re
 
 The single root-scoped `shell.bottom` slot spans the full width below the three columns. Its occupant controls its own height and visibility; the columns shrink by that height, and empty content reserves no space. Main-panel navigation preserves the bottom component. Column resize handles stop above it, while `shell.overlay` covers the whole frame. The default composition leaves this slot empty.
 
+Below 768px the frame is a page frame rather than a column solve: the page's column takes the whole width and the other two keep their cells without painting, so a page switch costs no column state. A bar in the bottom row, beside `shell.bottom`, switches between navigation, the main panel, and — only while the right panel's occupant is shown — the right column, which then fills the frame with that occupant's own narrow fullscreen presentation. Crossing the breakpoint either way returns to the main page; opening the right panel below it makes that column the page, and the sidebar toggle becomes the navigation page switch.
+
 <a id="window-chrome-seat"></a>
 ### Window-chrome seat
 

@@ -1,0 +1,97 @@
+/** The workbench tab body: the control row, the status line, and the file preview. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  height: 100%;
+  min-height: 0;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.button {
+  padding: 4px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.button[aria-pressed='true'] {
+  border-color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-brand-text);
+}
+
+.status {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.form {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.label {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+}
+
+.preview {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.media {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--dsw-font-mono, ui-monospace, monospace);
+  font-size: 12px;
+}
+
+.notice {
+  margin: 0;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.failure {
+  margin: 0;
+  color: var(--dsw-alias-brand-text);
+  font-size: 12px;
+}

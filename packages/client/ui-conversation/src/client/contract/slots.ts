@@ -296,6 +296,16 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
      * --dsh-composer-model-icon-display to block for an occupant's compact display.
      */
     'conversation.input.model': { kind: 'single'; scope: 'session'; owner: InputControlOwnerProps }
+    /**
+     * Rows inside the composer's context-occupancy panel, below the composition
+     * breakdown: how a feature links its own surface from the meter the user
+     * already opens to read occupancy.
+     */
+    'conversation.context.meter.action': {
+      kind: 'list'
+      scope: 'session'
+      owner: ContextMeterActionOwnerProps
+    }
   }
 
   interface SlotFactoryMap {
@@ -354,6 +364,12 @@ export interface HeroAgentPresetOwnerProps {
 
 /** Header actions derive their state from standard Session props. */
 export interface ConversationHeaderActionOwnerProps {
+  /** Marker field: entries receive no owner-specific values. */
+  children?: never
+}
+
+/** Occupancy-panel action rows derive their state from standard Session props. */
+export interface ContextMeterActionOwnerProps {
   /** Marker field: entries receive no owner-specific values. */
   children?: never
 }
@@ -502,7 +518,7 @@ export type ComposerBarProps =
     | 'conversation.input.permission'
     | 'conversation.input.left' | 'conversation.input.plan'
     | 'conversation.input.right' | 'conversation.input.model' | 'conversation.input.activity'
-    | 'conversation.composer.dock'
+    | 'conversation.composer.dock' | 'conversation.context.meter.action'
   >
   & InjectFace<ComposerBarInjected>
   & PropsLocale<'conversation'>
