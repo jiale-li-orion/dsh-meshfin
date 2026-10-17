@@ -94,6 +94,9 @@
     },
     {
       "path": "../../workbench/workbench"
+    },
+    {
+      "path": "../../session/session-context"
     }
   ]
 }
