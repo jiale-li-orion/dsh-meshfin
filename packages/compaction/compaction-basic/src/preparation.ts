@@ -671,7 +671,7 @@ function callFrom(
   result: SummaryResult,
   attempt: CompactionPreparationAttempt,
 ): CompactionPreparationCall {
-  const provenance = result.llmStreamCall === true
+  const streamCallFields = result.llmStreamCall === true
     ? { rawOutput: structuredClone(result.rawOutput), llmStreamCall: true as const }
     : result.rawOutput === undefined ? {} : { rawOutput: structuredClone(result.rawOutput) }
   return {
@@ -683,7 +683,7 @@ function callFrom(
     model: result.model,
     ...result.maxTokens === undefined ? {} : { maxTokens: result.maxTokens },
     ...result.usage === undefined ? {} : { usage: structuredClone(result.usage) },
-    ...provenance,
+    ...streamCallFields,
   }
 }
 

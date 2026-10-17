@@ -9,8 +9,8 @@
   en: 6cc2cd9ced70bb09
   zh: 1c0e6cb4ba2ed637
 /tool-schema-catalog/tool-package-map:
-  en: e72ad7af437fa362
-  zh: d8f3683a4efe01b0
+  en: 94c6a5e09b2c029f
+  zh: f297c54f1646fb45
 /tool-schema-catalog/deepseek-ai-dsh-plugin-manager:
   en: e0143916bb634762
   zh: e0143916bb634762
@@ -207,8 +207,35 @@
   en: 927a5ac0974b7642
   zh: 927a5ac0974b7642
 /tool-schema-catalog/deepseek-ai-dsh-tool-skill/skill:
-  en: 9b159d5831855afb
-  zh: 275ee82af0e0f59a
+  en: 0cbbad762b9f39e7
+  zh: 9159ef5451a02dae
+/tool-schema-catalog/deepseek-ai-dsh-tool-session-context:
+  en: d8c8f288385f493b
+  zh: d8c8f288385f493b
+/tool-schema-catalog/deepseek-ai-dsh-tool-session-context/context-commit:
+  en: e3465e2920dca812
+  zh: 6e916f4c48aa2b73
+/tool-schema-catalog/deepseek-ai-dsh-tool-session-context/context-discard-preparation:
+  en: cb1a34ac72abac5c
+  zh: 0f2ced63c9f10602
+/tool-schema-catalog/deepseek-ai-dsh-tool-session-context/context-edit-preparation:
+  en: 1909c639cf4256c5
+  zh: 69f3c7092697fdcf
+/tool-schema-catalog/deepseek-ai-dsh-tool-session-context/context-inspect:
+  en: b1cbdffd6a778a8f
+  zh: 573f46122ffe3de6
+/tool-schema-catalog/deepseek-ai-dsh-tool-session-context/context-prepare:
+  en: 1be7b1bd4b309383
+  zh: 4b4b61cc509fe764
+/tool-schema-catalog/deepseek-ai-dsh-tool-session-context/context-read:
+  en: bd820d8f051c7ab3
+  zh: f5b1f90b543f0303
+/tool-schema-catalog/deepseek-ai-dsh-tool-session-context/history-read:
+  en: 6b36a1c3c0a45dc4
+  zh: 0a182ee3a44fbe95
+/tool-schema-catalog/deepseek-ai-dsh-tool-session-context/history-search:
+  en: dce6db1ffafef06b
+  zh: 2c05a7a134e58674
 /tool-schema-catalog/deepseek-ai-dsh-tool-session-query:
   en: eac1dff4b6d9e195
   zh: eac1dff4b6d9e195
@@ -294,8 +321,20 @@
   en: dea62d26fb18ff68
   zh: dea62d26fb18ff68
 /tool-schema-catalog/deepseek-ai-dsh-tool-todo/todo-write:
-  en: f252137b940b38d1
-  zh: 25bd9c6b1ce783d8
+  en: 51029877dabb3418
+  zh: 70526c1f0cbcaa00
+/tool-schema-catalog/deepseek-ai-dsh-tool-workbench:
+  en: 7e0b3c81ab84c521
+  zh: 7e0b3c81ab84c521
+/tool-schema-catalog/deepseek-ai-dsh-tool-workbench/workbench-close:
+  en: 80d731ec1cc2000d
+  zh: 113456c8a4f82ce1
+/tool-schema-catalog/deepseek-ai-dsh-tool-workbench/workbench-open:
+  en: 3f33f2eea6effd14
+  zh: 57eb65e17707cb9f
+/tool-schema-catalog/deepseek-ai-dsh-tool-workbench/workbench-status:
+  en: 7f9f2129a2a84cb2
+  zh: b78e0b3a6f8767a8
 /tool-schema-catalog/deepseek-ai-dsh-tool-working-directory:
   en: 1bdc4627ca4fff29
   zh: 1bdc4627ca4fff29

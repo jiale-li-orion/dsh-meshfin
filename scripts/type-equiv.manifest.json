@@ -2367,6 +2367,51 @@
       "source": "packages/core/session/src/surface.ts"
     },
     {
+      "doc": "docs/subsystems/session-context.md",
+      "symbol": "ContextUnit",
+      "source": "packages/session/session-context/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-context.md",
+      "symbol": "ContextSnapshot",
+      "source": "packages/session/session-context/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-context.md",
+      "symbol": "ContextPreparation",
+      "source": "packages/session/session-context/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-context.md",
+      "symbol": "ContextRewriteRequest",
+      "source": "packages/session/session-context/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-context.md",
+      "symbol": "ContextRewriteResult",
+      "source": "packages/session/session-context/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-context.md",
+      "symbol": "ContextHistoryEntry",
+      "source": "packages/session/session-context/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-context.md",
+      "symbol": "ContextHistoryReadResult",
+      "source": "packages/session/session-context/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-context.md",
+      "symbol": "ContextHistorySearchMatch",
+      "source": "packages/session/session-context/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/session-context.md",
+      "symbol": "ContextHistorySearchResult",
+      "source": "packages/session/session-context/src/types.ts"
+    },
+    {
       "doc": "docs/subsystems/ptc-runtime.md",
       "symbol": "PtcRunSpec",
       "source": "packages/ptc-runtime/ptc-runtime/src/types.ts"
@@ -2481,6 +2526,16 @@
       "doc": "docs/subsystems/boot.md",
       "symbol": "PendingModule",
       "source": "packages/boot/hmr/src/index.ts"
+    },
+    {
+      "doc": "docs/subsystems/workbench.md",
+      "symbol": "WorkbenchView",
+      "source": "packages/workbench/workbench/src/types.ts"
+    },
+    {
+      "doc": "docs/subsystems/workbench.md",
+      "symbol": "FencedSessionPath",
+      "source": "packages/workbench/workbench/src/fence.ts"
     }
   ]
 }

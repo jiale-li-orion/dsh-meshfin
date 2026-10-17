@@ -2,7 +2,7 @@
 
 [English](session-context.md) | 中文
 
-把当前模型可见 Session 表层作为可检查、可替换的产品能力。[`@deepseek-ai/dsh-session-context`](../../packages/session/session-context) 负责宿主服务与 Remote 类型；[已实现决策](../../.agents/notes/implemented/feature/2026-08-16-session-context-management.md)负责解释 Chat、Context 与 Trajectory 为何保持独立投影。
+把当前模型可见 Session 表层作为可检查、可替换的产品能力。[`@deepseek-ai/dsh-session-context`](../../packages/session/session-context) 负责宿主服务与 Remote 类型。它读取 `Session.surface`，而不是分页的人类对话记录，因此 Context、Chat 与 Trajectory 是同一份仅追加日志的三种独立投影。
 
 源码：[`packages/session/session-context/src/types.ts`](../../packages/session/session-context/src/types.ts)
 
@@ -12,8 +12,8 @@
 /** Bounded metadata for one indivisible current-surface unit. */
 interface ContextUnit {
   readonly id: ContextUnitId
-  readonly startSeq: number
-  readonly endSeq: number
+  readonly startSeq: SessionSeq
+  readonly endSeq: SessionSeq
   readonly kind: ContextUnitKind
   readonly role: ContextUnitRole
   readonly tokenCount: number
@@ -29,10 +29,12 @@ interface ContextUnit {
 /** Current durable model-surface snapshot for one live Agent. */
 interface ContextSnapshot {
   readonly sessionId: SessionId
-  readonly logRevision: number
+  /** Events consumed by this capture; equal to the Session's next event seq. */
+  readonly logRevision: SessionLogOffset
   readonly replaceGeneration: number
-  readonly generationSeq: number | null
-  readonly tailSeq: number | null
+  /** Seq of the latest positional surface replacement, or null for the initial generation. */
+  readonly generationSeq: SessionSeq | null
+  readonly tailSeq: SessionSeq | null
   readonly totalTokens: number
   readonly surfaceTokens: number
   readonly route?: { readonly provider: string; readonly model: string }
@@ -53,8 +55,8 @@ interface ContextSnapshot {
 interface ContextPreparation {
   readonly preparationId: CompactionPreparationId
   readonly status: ContextPreparationStatus
-  readonly startSeq: number
-  readonly endSeq: number
+  readonly startSeq: SessionSeq
+  readonly endSeq: SessionSeq
   readonly unitCount: number
   readonly shadowedTokenCount: number
   readonly preservationBrief?: string
@@ -78,11 +80,10 @@ interface ContextPreparation {
 /** Structured same-Session rewrite request from UI or another trusted consumer. */
 interface ContextRewriteRequest {
   readonly unitId: ContextUnitId
-  readonly expectedTailSeq: number
+  readonly expectedTailSeq: SessionSeq
   readonly mode: ContextRewriteMode
   /** Replacement prose; the Host retains image blocks from the selected current message. */
   readonly text: string
-  readonly continue: boolean
 }
 ```
 
@@ -90,15 +91,14 @@ interface ContextRewriteRequest {
 /** Committed rewrite result. */
 interface ContextRewriteResult {
   readonly rewriteId: ContextRewriteId
-  readonly replacementSeq: number
-  readonly previousGenerationSeq: number | null
+  readonly replacementSeq: SessionSeq
+  readonly previousGenerationSeq: SessionSeq | null
   readonly shadowedItemCount: number
   readonly shadowedTokenCount: number
-  readonly contextRunId?: ContextRunId
 }
 ```
 
-`edit-and-continue` 替换选中单元到已加载尾部。`patch` 替换一个平衡单元。宿主会在 append 前校验单元、尾部、编辑权限与图片保留；`continue` 会在 flush 后请求一项独立持久 context run。
+`edit-and-continue` 替换选中单元到已加载尾部。`patch` 替换一个平衡单元。宿主会在 append 前校验单元、尾部、编辑权限与图片保留，随后追加替换用的用户消息与一条 `context/rewrite` 记录，写明被遮蔽的确切表层。改写不启动模型回合：替换内容就是该 Agent 下一次所服务请求的当前上下文。
 
 ## 检查点召回
 
@@ -106,8 +106,9 @@ interface ContextRewriteResult {
 /** One canonical fragment of an original model-visible message. */
 interface ContextHistoryEntry {
   readonly checkpointId: CompactionId
-  readonly seq: number
-  readonly role: 'user' | 'assistant'
+  readonly seq: SessionSeq
+  /** Model role of the recalled original; upstream keeps tool results as their own messages. */
+  readonly role: Message['role']
   /** UTF-16 offset in the canonical serialized message. */
   readonly offset: number
   readonly text: string
@@ -130,7 +131,7 @@ interface ContextHistoryReadResult {
 /** One checkpoint-addressed literal match. */
 interface ContextHistorySearchMatch {
   readonly checkpointId: CompactionId
-  readonly seq: number
+  readonly seq: SessionSeq
   /** UTF-16 offset in the canonical serialized message. */
   readonly offset: number
   readonly snippet: string

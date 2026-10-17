@@ -314,7 +314,7 @@ export function commitPreparedSurfaceRegion(
   if (finalCall === undefined) {
     throw new ManualCompactionError('summary', 'prepared compaction has no provider call')
   }
-  const callProvenance = finalCall.llmStreamCall === true
+  const streamCallFields = finalCall.llmStreamCall === true
     ? { rawOutput: finalCall.rawOutput, llmStreamCall: true as const }
     : finalCall.rawOutput === undefined ? {} : { rawOutput: finalCall.rawOutput }
   return compactSurfaceRegion(
@@ -329,7 +329,7 @@ export function commitPreparedSurfaceRegion(
         model: finalCall.model,
         ...finalCall.maxTokens === undefined ? {} : { maxTokens: finalCall.maxTokens },
         ...finalCall.usage === undefined ? {} : { usage: finalCall.usage },
-        ...callProvenance,
+        ...streamCallFields,
       }),
     },
     agent.session,

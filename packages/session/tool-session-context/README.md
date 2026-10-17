@@ -23,7 +23,6 @@ These tools let the model look at and manage its own context. `context_inspect` 
 
 Model-facing Consumer for current Context inspection, reviewed range compaction, and checkpoint recall. It delegates authority, durability, stale-state checks, and bounds to [`ctx.sessionContext`](../session-context/README.md).
 
-<a id="tools"></a>
 ## Configuration
 
 | Field | Default | Meaning |
@@ -33,6 +32,7 @@ Model-facing Consumer for current Context inspection, reviewed range compaction,
 | `searchBytes` | `524288` | Maximum original bytes one `history_search` call may scan. |
 | `searchResults` | `20` | Maximum literal matches one `history_search` call may return. |
 
+<a id="tools"></a>
 ## Tools
 
 The generated [tool schema catalog](../../../docs/tool-catalog.md#deepseek-aidsh-tool-session-context) owns exact descriptions and JSON Schemas.
@@ -106,8 +106,9 @@ Preparation pays for one or more auxiliary summarizer calls. Commit requires the
 
 Auxiliary calls are independent. A committed replacement preserves the prefix before the range and invalidates the conversation request from the range start.
 
-<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **No model-facing message rewrite tool** — same-Session edit-and-continue is currently a human Web action; the model can inspect, compact, and recall but cannot directly rewrite an arbitrary current user message.
 - **Literal recall only** — the Consumer exposes no regex, semantic, or cross-session search.

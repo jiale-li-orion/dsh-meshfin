@@ -2,7 +2,7 @@
 
 English | [中文](workbench.zh.md)
 
-`@deepseek-ai/dsh-workbench` owns the shared workbench view: whether the workbench column is open and which panel is selected. The browser and the agent both mutate that one value — browser gestures arrive as Remote calls, `@deepseek-ai/dsh-tool-workbench` writes the same value through `workbench_open`/`workbench_close`, and every commit emits `workbench/changed`, which the web client consumes through the forwarded-event allowlist. The service also answers the file panel's directory listings, fenced to the calling session's recorded working directory and resolved through `ctx.fs`; `@deepseek-ai/dsh-workbench-bytes` serves the listed files' bytes over that same fence.
+`@deepseek-ai/dsh-workbench` owns the shared workbench view: whether the workbench column is open and which panel is selected. The browser and the agent both mutate that one value — browser gestures arrive as Remote calls, `@deepseek-ai/dsh-tool-workbench` writes the same value through `workbench_open`/`workbench_close`, and every commit emits `workbench/changed`, which the web client consumes through the forwarded-event allowlist. The package also exports the three values `@deepseek-ai/dsh-workbench-bytes` reads: the workspace fence `fenceSessionPath`, the extension-to-media-type mapping `contentTypeForPath`, and the `/api/workbench/file` route path.
 
 Source: [`packages/workbench/workbench/src/types.ts`](../../packages/workbench/workbench/src/types.ts)
 
@@ -25,67 +25,27 @@ interface WorkbenchView {
 }
 ```
 
-## Fenced listing
+## Workspace fence
 
-`listDir(sessionId, path)` resolves the session's recorded `cwd` as the fence and lists through the `fs` capability, so the panel sees the tree the agent operates in and nothing outside it. A session without a recorded working directory, or a path that escapes it, is refused with `WORKBENCH_OUTSIDE_WORKSPACE` rather than served. The same `fenceSessionPath` resolves the byte route's requests, so a path a panel may list is exactly a path a viewer may stream.
+`fenceSessionPath(ctx, sessionId, path)` resolves one path inside the session's recorded `cwd` through `ctx.fs`: `path: null` resolves to the root, a relative path resolves against the recorded directory, and a request is fenced by the pair below. A session that records no working directory, or a target outside it, raises `WorkbenchFenceError` with code `WORKBENCH_OUTSIDE_WORKSPACE` instead of resolving, so a refusal names the offending path rather than serving it. `contentTypeForPath(path)` maps the file extension to the media type the byte route serves as `Content-Type`, and answers `application/octet-stream` for an unknown or absent extension, so neither plane re-derives a type from the name.
 
 ```ts type-equiv
-/** One child of a listed directory. */
-interface WorkbenchDirEntry {
-  /** Basename inside the listed directory. */
-  name: string
-  /** Whether the child is a regular file, a directory, or something else. */
-  type: 'file' | 'directory' | 'other'
-  /** Backend display path, safe to render. */
-  path: string
-  /** Byte size of a regular file when the backend reports one. */
-  size?: number
-  /**
-   * Media type of a regular file, chosen from its extension by
-   * `contentTypeForPath`; absent for directories and other entries. The viewer
-   * chain routes on it and the byte route serves it as `Content-Type`, so the
-   * browser never re-derives a type from the name.
-   */
-  mediaType?: string
+/** One fenced resolution: the workspace root and the requested target inside it. */
+interface FencedSessionPath {
+  /** The session's recorded working directory, resolved through `fs`. */
+  root: FsTarget
+  /** The requested path; equal to `root` when `path` was null. */
+  target: FsTarget
 }
 ```
 
-```ts type-equiv
-/**
- * One directory listing, fenced to a session's recorded working directory.
- * `root` is that directory; every entry path is inside it.
- */
-interface WorkbenchListing {
-  /** The session's recorded working directory the listing is fenced to. */
-  root: string
-  /** The listed directory (equal to `root` for the top level). */
-  path: string
-  /**
-   * Path prefix serving every entry's bytes, carrying no query. A client builds
-   * `fileRoute?sessionId=<id>&path=<entry path>` for the viewer, so the byte
-   * route's location has one home instead of a constant per plane.
-   */
-  fileRoute: string
-  /**
-   * Route a client POSTs an uploaded file to: `uploadRoute?sessionId=<id>&name=<name>`
-   * with the bytes as the body. The file lands in this workspace's `uploads/`
-   * directory and the response names the path it was written to.
-   */
-  uploadRoute: string
-  /** Children in backend order. */
-  entries: readonly WorkbenchDirEntry[]
-}
-```
+## Bytes
 
-## Bytes and the viewer
-
-`@deepseek-ai/dsh-workbench-bytes` registers one `webServer` prefix (`/workbench/file`) that streams a workspace file to the browser. A request passes the browser trust fence (`connection.isTrustedRequest`, the deployment's `trustedHosts` policy) and then the workspace fence, and the body is streamed from the resolved target's process path rather than read whole: `Range` requests answer `206` with a `content-range`, an unsatisfiable range answers `416`, and `HEAD` returns the headers alone. A malformed, multi-range, or unknown-unit header is ignored and the whole representation is served.
-
-The viewer itself is the `workbench.viewer` chain seat the workbench shell declares: `@deepseek-ai/dsh-client-ui-workbench` registers one entry per media family (`image/*`, `audio/*`, `video/*`) whose selector elects the listing's `mediaType`, and a type nothing elects falls to the shell's no-preview notice. Which file a window previews is browser-local (the shell store); only the column's open state and the panel choice are shared with the host and the agent.
+`@deepseek-ai/dsh-workbench-bytes` registers one exact Fetch route on the shared `/api` channel (`WORKBENCH_FILE_PATH`) for `GET` and `HEAD`. The carrier applies its trust and authentication policy before the handler runs, so only owner Peers reach the route; the handler then applies the workspace fence. The body streams from the resolved target's process path rather than reading the file whole: `Range` requests answer `206` with a `content-range`, an unsatisfiable range answers `416`, and `HEAD` returns the headers without a body. A malformed, multi-range, or unknown-unit header is ignored and the whole representation is served; a missing `sessionId` or `path` answers `400`, a fenced-out path answers `403`, and a target that is not a regular file answers `404`.
 
 ## Events
 
-`workbench/changed` carries the committed view on every commit. The event is one-way and payload-only, so the forwarded-event allowlist can deliver it to a browser verbatim; the invariant companion asserts each payload equals the state the service holds.
+`workbench/changed` carries the committed view on every commit. The event is one-way and payload-only, so the forwarded-event allowlist can deliver it to a browser verbatim.
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

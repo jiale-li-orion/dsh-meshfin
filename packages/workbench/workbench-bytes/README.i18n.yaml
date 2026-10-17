@@ -2,18 +2,30 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/workbench/workbench-bytes/README.md
+/:
+  en: 151495f72237bbcb
+  zh: bd4154b851b5500f
 /deepseek-ai-dsh-workbench-bytes:
-  en: 25bf3c090b639172
-  zh: d2fe122a91545030
-/deepseek-ai-dsh-workbench-bytes/uploads-and-ingest-records:
-  en: 0515b7785d20c4ee
-  zh: 6057bec48b847efb
+  en: 38219e2ac5c8b127
+  zh: fdf312df9915ca10
+/deepseek-ai-dsh-workbench-bytes/summary:
+  en: 6eadc327f6064d48
+  zh: ac08a29a4b6cd0bd
+/deepseek-ai-dsh-workbench-bytes/table-of-contents:
+  en: f7a2a90e62567e01
+  zh: 3c8ff393de157095
+/deepseek-ai-dsh-workbench-bytes/route:
+  en: 88ff324e357e12bd
+  zh: 5eb964132b3daf45
 /deepseek-ai-dsh-workbench-bytes/model-experience:
-  en: ac148965344ae0de
-  zh: c1b4a292c9983460
+  en: 6603514e0481fb9f
+  zh: 6603514e0481fb9f
 /deepseek-ai-dsh-workbench-bytes/model-experience/kv-cache-effect:
   en: ca75c51c89c2c9b0
-  zh: bacec35330ccc487
+  zh: ca75c51c89c2c9b0
 /deepseek-ai-dsh-workbench-bytes/known-limitations-and-deferred-work:
-  en: 62e3142b917056aa
-  zh: 194d5bbdfbc715e1
+  en: d4ff1508d243b18c
+  zh: 21b92a5d17f2128c
+/deepseek-ai-dsh-workbench-bytes/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 19552bf86462c38f

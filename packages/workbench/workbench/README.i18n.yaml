@@ -2,15 +2,33 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/workbench/workbench/README.md
+/:
+  en: a7eb9731595fd91d
+  zh: 4c395c0b54d6fe9d
 /deepseek-ai-dsh-workbench:
-  en: 2d05847b84ab51ef
-  zh: 13598bd8cb7449d3
+  en: d66017d00cd1b74f
+  zh: 95a48fc2b557068d
+/deepseek-ai-dsh-workbench/summary:
+  en: 2b617d3db9155521
+  zh: 436e5d1cf6662b1f
+/deepseek-ai-dsh-workbench/table-of-contents:
+  en: 42b2f8f4d9d78a02
+  zh: 4af512359dcc8f91
+/deepseek-ai-dsh-workbench/remote-namespace:
+  en: 49c8e6f00763370a
+  zh: ab944a2b20f1dd30
+/deepseek-ai-dsh-workbench/exported-vocabulary:
+  en: 8ea09760fa0c0219
+  zh: 9c0398b98d59b94e
 /deepseek-ai-dsh-workbench/model-experience:
-  en: 3e22d545d0f29fe5
-  zh: b08ba5f9cc914df0
+  en: 947e6808db78a67f
+  zh: 947e6808db78a67f
 /deepseek-ai-dsh-workbench/model-experience/kv-cache-effect:
   en: ca75c51c89c2c9b0
-  zh: de54f3467ef3b9be
+  zh: ca75c51c89c2c9b0
 /deepseek-ai-dsh-workbench/known-limitations-and-deferred-work:
-  en: 6bc48b470c6d5665
-  zh: 3d7c6b91ae62e5e6
+  en: 9a06d3defb0675ec
+  zh: 8fb759918369e067
+/deepseek-ai-dsh-workbench/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 19552bf86462c38f

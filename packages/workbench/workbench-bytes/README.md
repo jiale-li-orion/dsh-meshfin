@@ -1,18 +1,36 @@
+---
+description: "The fenced workbench file route: streams one workspace file to the browser viewer with Range/206/416 support through the fs capability."
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-workbench-bytes
 
 English | [中文](README.zh.md)
 
-The workbench byte route: one `webServer` prefix (`/workbench/file`) that streams a workspace file to the browser for the file panel's viewer. A request carries the session id and the path; the route passes the browser trust fence (`connection.isTrustedRequest`, which applies the deployment's `trustedHosts` policy) and the workspace fence (`dsh-workbench`'s `fenceSessionPath`, the same one the panel's listing uses), then streams from the resolved target's process path with `createReadStream`. `Range` requests are served as `206` with a `content-range`, an unsatisfiable range as `416`, and `HEAD` returns the headers without a body, so a video seeks and a large image loads without holding the file in memory.
+## Summary
 
-## Uploads and ingest records
+The workbench byte route. One exact Fetch route — `GET` and `HEAD` on `/api/workbench/file?sessionId=<id>&path=<path>` — streams a workspace file to the browser's file viewer. The carrier admits only owner Peers, the handler applies the workspace fence `dsh-workbench` exports, and the body streams from the resolved target's process path with `Range` support, so a video seeks and a large image loads without the file being held in memory.
 
-`POST /workbench/upload` accepts a file body and query parameters `sessionId`, `name`, and optional `device` and `ingestId`. The same browser trust check and workspace fence apply; files land in `uploads/<device>/`, using `unknown` when no source is declared. `maxUploadBytes` bounds the body, defaulting to 64 MiB. An upload returns its path and byte count without creating a user message.
+## Table of Contents
 
-A successful upload carrying `ingestId` records its path, byte count, SHA-256, client class, media type, and receipt time in `uploads/.dsh/ingest.json`. A retry of a completed request returns that record with `repeat: true` without reading the retry body, and a retry arriving while the same id is still being written waits for that attempt and is answered from its outcome instead of storing the bytes twice. IDs are data keys, including `constructor` and `__proto__`. Records are written under the index's writer lock and the index is replaced atomically, so two uploads accepted at once keep both records and no reader sees a partial file. A record whose fields do not validate, or whose path is not a plain file name inside its own bucket, is ignored while other valid records survive. Two uploads of one name claim separate files, because a path is taken by an exclusive create rather than by checking that it is free: simultaneous uploads cannot interleave into one file.
+- [Route](#route)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
 
+-----
+
+<a id="route"></a>
+## Route
+
+The plugin registers one route on the shared `/api` channel through `ctx.connection.fetch.register`, at `WORKBENCH_FILE_PATH` for `GET` and `HEAD`. The physical carrier applies its trust and authentication policy before the handler runs, so only owner Peers reach the route. The handler then resolves the request through `fenceSessionPath` and streams from `ctx.fs.processPath(target)`.
+
+Every answer carries `content-type` from `contentTypeForPath` and `cache-control: no-store`. A missing `sessionId` or `path` answers `400`, a fenced-out request answers `403`, and a target that is not a regular file answers `404`. With a known size the response also carries `content-length` and `accept-ranges: bytes`; a `Range` request answers `206` with a `content-range`, an unsatisfiable range answers `416` with `content-range: bytes */<size>`, and `HEAD` returns the headers without a body. [The workbench subsystem page](../../../docs/subsystems/workbench.md) owns the fence and the media-type map.
+
+<a id="model-experience"></a>
 ## Model Experience
 
-None, as this package serves browser bytes; the model-facing workbench projections live in `dsh-tool-workbench`.
+None, as this package serves browser bytes and the model-facing workbench projections live in `dsh-tool-workbench`.
 
 #### KV Cache effect
 
@@ -20,6 +38,18 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **One range per request** — a multi-range header is ignored and the whole representation is served, because the viewers issue single ranges and multipart/byteranges responses would add a boundary encoder with no consumer.
-- **Ingest recovery** — the uploaded file and its index record are not one transaction: a crash between them leaves a file that no record names, and the next attempt of that pick writes another copy rather than adopting it. A record is not revalidated against a file that was moved or modified afterwards, the recorded media type comes from the name rather than from the bytes, and expiration cleanup is not implemented.
+<a id="known-limitations-and-deferred-work"></a>
+
+- **One range per request** — a multi-range header is ignored and the whole representation is served, because the viewers issue single ranges and a multipart/byteranges response would add a boundary encoder with no consumer.
 - **The fence is the session's recorded working directory** — a session without one cannot be served, and a path outside it is refused with `403`.
+- **The media type comes from the name** — `contentTypeForPath` reads the extension, so a file whose content disagrees with its name is served under the name's type.
+
+<a id="dev-note"></a>
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+None.
+
+</details>

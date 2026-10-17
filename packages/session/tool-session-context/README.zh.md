@@ -23,7 +23,6 @@ kind: "package-reference"
 
 面向模型的 Consumer，负责当前 Context 检查、可评审范围压缩与检查点召回。权限、持久性、陈旧状态校验和上限都委托给 [`ctx.sessionContext`](../session-context/README.zh.md)。
 
-<a id="tools"></a>
 ## 配置
 
 | 字段 | 默认值 | 含义 |
@@ -33,6 +32,7 @@ kind: "package-reference"
 | `searchBytes` | `524288` | 一次 `history_search` 最多扫描的原文字节数。 |
 | `searchResults` | `20` | 一次 `history_search` 最多返回的字面匹配数。 |
 
+<a id="tools"></a>
 ## 工具
 
 生成的[工具 schema 目录](../../../docs/tool-catalog.zh.md#deepseek-aidsh-tool-session-context)负责准确描述与 JSON Schema。
@@ -106,8 +106,9 @@ Preparation 会支付一次或多次辅助摘要调用成本。Commit 要求带�
 
 辅助调用彼此独立。已提交替换会保留范围之前的前缀，并使对话请求从范围起点失效。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **没有面向模型的消息改写工具** — 同 Session edit-and-continue 当前属于 Web 人工操作；模型可以检查、压缩和召回，但不能直接改写任意当前用户消息。
 - **仅支持字面召回** — Consumer 不暴露正则、语义或跨会话搜索。

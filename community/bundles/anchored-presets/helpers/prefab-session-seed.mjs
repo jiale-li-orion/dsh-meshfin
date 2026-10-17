@@ -419,7 +419,7 @@ export function synchronizeAgentTurnCursor(agent, session) {
   return lastTurn
 }
 
-/** Append the compact template while remapping retained provenance seqs. */
+/** Append the compact template while remapping the seqs the retained events came from. */
 export function seedSession(session, plan, title = READY_TITLE) {
   if (session.events.some((event) => event.type === 'turn/start')) return false
 

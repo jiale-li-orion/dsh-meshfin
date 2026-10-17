@@ -120,8 +120,9 @@ Preparation 是独立请求。Commit 保留范围之前的复用资格，并使�
 
 宿主读取不影响 cache 状态。被召回工具结果会追加在既有请求前缀之后。
 
-<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **需要实时 Agent** — Remote lookup 寻址 Agent-backed Session；该服务不会直接检查任意已持久化但尚未加载的日志。
 - **仅支持会话内字面召回** — 搜索不提供正则、语义排序或跨会话索引。

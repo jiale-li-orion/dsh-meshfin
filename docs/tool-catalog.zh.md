@@ -41,12 +41,14 @@
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.workingDirectory`、`ctx.tools`、`ctx.lsp`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，因此其模型可见 schema 在更换提供方时保持稳定。运行时要求已注册提供方，例如 `@deepseek-ai/dsh-lsp-stdio`；如果没有提供方，查询会返回结构化 `LSP_UNAVAILABLE` 错误，而不会改变 schema。 |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`、`ctx.workflowEngine`、`ctx.subagents`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents every fresh round)` | `tool/call`、`tool/result`、`workflow and child session events during execution` | - | 固定的前台工作流会在每个 Round 启动一个全新的结构化子级；模型只能选择不可变目标和可选的 Round 上限。 |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.workingDirectory`、`ctx.tools`、`ctx.agents`、`ctx.skills` | `tool/call`、`tool/result`、`user/message replacement catalogs via agent.inject()` | - | - |
+| `@deepseek-ai/dsh-tool-session-context` | `context_commit`、`context_discard_preparation`、`context_edit_preparation`、`context_inspect`、`context_prepare`、`context_read`、`history_read`、`history_search` | `ctx.tools`、`ctx.systemPrompt`、`ctx.sessionContext`、`a calling Agent` | `tool/call`、`compaction/preparation/* plus one compaction bracket on commit`、`tool/result` | - | 这些 `context_*` 工具都作用于调用方 Agent。`context_prepare` 记录一份可评审摘要而不改变上下文；只有 `context_commit` 会替换选中范围，且原文仍可召回。`history_read` 与 `history_search` 取自 `context_inspect` 的 checkpoint id。 |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`、`session_event_search`、`session_event_trace`、`session_search`、`session_trace` | `ctx.tools`、`ctx.systemPrompt`、`ctx.sessionQuery`、`a calling Agent for workspace authority` | `tool/call`、`tool/result` | - | 这 5 个只读工具会隐藏提供方游标，并根据不可变的调用 agent 会话为每个结果授权。该包需要选择启用；需要强制截止时间或限制行内输出的组合还会挂载通用超时或 spill 策略。 |
 | `@deepseek-ai/dsh-tool-subagent` | `list_subagent_models`、`subagent` | `ctx.tools`、`ctx.subagents`、`ctx.systemPrompt`、`用于模型发现和所选路由校验的 ctx.llm` | `tool/call`、`tool/result`、`child session events through the chosen provider` | `subagent`、`subagent_fork` | 注册的委派工具名称取决于加载时 `toolName` 配置（默认为 `subagent`）；上述默认 schema 关闭模型选择，而发现 schema 则展示为已启用 Session 中可用的固定配套工具。Web preset 会在每个新顶层 Session 创建时读取插件页偏好，并为其子 Session 保留该决定；`subagent_fork` 始终使用固定路由。每个实例通过 `provider` 选择后端，通过 `modelSelectionSettings` 读取模型选择设置。每次委派都会立即返回子代理 id；本地子代理接受后续消息，外部后端自动汇报单次执行结果。 |
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`、`list_agents`、`send_message` | `ctx.tools`、`ctx.subagents`、`ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`、`tool/result`、`child session events through ctx.subagents` | - | 这些是用于发现、中断托管 subagent 和向本地子代理发送消息的全局命名工具：绑定提供方的 `tool-subagent` 实例注册不同的委派工具；本包注册一次 `send_message` 和 `interrupt_agent`，另由 `list_agents` 通过单独加载的 `/list-agents` 插件提供，其目录行使用 sessionProjections 和实时 Agent 注册表。 |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`、`job_list`、`job_output` | `ctx.tools`、`ctx.jobs`、`ctx.systemPrompt` | `tool/call`、`tool/result`、`user/message via agent.inject() for background completion notices` | - | 与任务种类无关的后台任务控制器：后台 bash 命令与 PTY 发送 都通过相同的 3 个工具读取、列出和终止。加载该插件会挂接控制器，从而启用生产方的 `ctx.jobs.start()`。 |
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | `interrupt_agent`、`list_agents`、`send_message`、`spawn_teammate`、`team_task_create`、`team_task_get`、`team_task_list`、`team_task_update`、`wait_agent` | `ctx.tools`、`ctx.systemPrompt`、`ctx.agentTeams`、`an exact live Team member Agent` | `tool/call`、`team/member`、`team/task`、`agent/inbox/spliced`、`user/message on inbox claim`、`tool/result` | - | 这 9 个工具限定于隐式 Team Lead 与持久 teammate 作用域。随产品发布的 dsh-base bundle 默认禁用该包；文档中的 Agent Teams profile patch 会启用它，并禁用旧 continuable child 的同名控制工具。 |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
+| `@deepseek-ai/dsh-tool-workbench` | `workbench_close`、`workbench_open`、`workbench_status` | `ctx.tools`、`ctx.workbench` | `tool/call`、`tool/result` | - | 该视图是进程全局的而非会话所有，因此每次调用都触及内置 `global` 资源，`workbench/changed` 把每份已提交视图同样带给浏览器与 agent。 |
 | `@deepseek-ai/dsh-tool-working-directory` | `working_directory` | `ctx.tools`, `ctx.workingDirectory` | `tool/call`, `working-directory/change`, `user context for directory changes`, `tool/result` | - | 读取或改变调用方 Session 的目录。已有 shell 和进程保留自己的目录；原始元数据和权限根目录保持不变。 |
 | `@deepseek-ai/dsh-experimental-tool-worktree` | `create_worktree` | `ctx.tools`, `ctx.worktrees`, `a calling Agent` | `tool/call`, `Git branch and checkout`, `working-directory/change`, `tool/result` | - | 仅通过显式实验组合加载。在现有写权限下从固定的本地提交创建新分支与检出目录，再改变 Session 工作目录。离开时保留分支与检出目录。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
@@ -1833,6 +1835,220 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 
 来源：[`packages/skill/tool-skill/src/index.ts`](../packages/skill/tool-skill/src/index.ts)
 
+<a id="deepseek-aidsh-tool-session-context"></a>
+
+## `@deepseek-ai/dsh-tool-session-context`
+
+### `context_commit`
+
+在当前轮次内提交一份已评审的 preparation。它会在后续模型上下文中替换该确切范围；原文仍可从仅追加日志中召回。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "preparation_id": {
+      "type": "string",
+      "description": "Ready preparation id."
+    }
+  },
+  "required": [
+    "preparation_id"
+  ]
+}
+```
+
+来源：[`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `context_discard_preparation`
+
+丢弃一份 ready 或 failed 的 preparation，不改变当前上下文。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "preparation_id": {
+      "type": "string",
+      "description": "Preparation id to discard."
+    }
+  },
+  "required": [
+    "preparation_id"
+  ]
+}
+```
+
+来源：[`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `context_edit_preparation`
+
+替换一份 ready preparation 的评审摘要。这仍然不改变当前上下文。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "preparation_id": {
+      "type": "string",
+      "description": "Opaque preparation id from context_prepare or context_inspect."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Complete replacement checkpoint Markdown."
+    }
+  },
+  "required": [
+    "preparation_id",
+    "summary"
+  ]
+}
+```
+
+来源：[`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `context_inspect`
+
+把确切的当前模型可见上下文作为平衡单元、token 计价、代际、检查点与待评审的 preparation 来检查。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "before_index": {
+      "type": "integer",
+      "description": "Exclusive unit index for an earlier page. Omit to read the current tail."
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Maximum units to return, capped at 100."
+    }
+  }
+}
+```
+
+来源：[`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `context_prepare`
+
+为一段连续的平衡单元范围生成并持久记录一份可评审摘要，不改变当前上下文。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "start_unit_id": {
+      "type": "string",
+      "description": "First unit id from context_inspect."
+    },
+    "end_unit_id": {
+      "type": "string",
+      "description": "Last unit id from context_inspect."
+    },
+    "preservation_brief": {
+      "type": "string",
+      "description": "Exact facts, literals, or artifacts the summary must preserve."
+    }
+  },
+  "required": [
+    "start_unit_id",
+    "end_unit_id"
+  ]
+}
+```
+
+来源：[`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `context_read`
+
+读取 context_inspect 返回的某个 unit_id 的完整当前内容。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "unit_id": {
+      "type": "string",
+      "description": "Opaque current Context unit id."
+    }
+  },
+  "required": [
+    "unit_id"
+  ]
+}
+```
+
+来源：[`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `history_read`
+
+读取某个检查点所遮蔽原文的一页有界结果，可选地递归展开嵌套检查点。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "checkpoint_id": {
+      "type": "string",
+      "description": "Checkpoint id from context_inspect."
+    },
+    "cursor": {
+      "type": "string",
+      "description": "Opaque nextCursor from the previous history_read page."
+    },
+    "recursive": {
+      "type": "boolean",
+      "description": "Expand nested checkpoints. Defaults to true."
+    }
+  },
+  "required": [
+    "checkpoint_id"
+  ]
+}
+```
+
+来源：[`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `history_search`
+
+用有界的字面量查询搜索某个检查点可达的原文。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "checkpoint_id": {
+      "type": "string",
+      "description": "Checkpoint id from context_inspect."
+    },
+    "query": {
+      "type": "string",
+      "description": "Literal text to find."
+    },
+    "cursor": {
+      "type": "string",
+      "description": "Opaque nextCursor from the previous search page."
+    },
+    "case_sensitive": {
+      "type": "boolean",
+      "description": "Use exact case. Defaults to false."
+    },
+    "recursive": {
+      "type": "boolean",
+      "description": "Search nested checkpoints. Defaults to true."
+    }
+  },
+  "required": [
+    "checkpoint_id",
+    "query"
+  ]
+}
+```
+
+来源：[`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+这些 `context_*` 工具都作用于调用方 Agent。`context_prepare` 记录一份可评审摘要而不改变上下文；只有 `context_commit` 会替换选中范围，且原文仍可召回。`history_read` 与 `history_search` 取自 `context_inspect` 的 checkpoint id。
+
 <a id="deepseek-aidsh-tool-session-query"></a>
 
 ## `@deepseek-ai/dsh-tool-session-query`
@@ -2614,6 +2830,56 @@ lsp 工具将提供方选择和语言服务器子进程置于 ctx.lsp 之后，�
 来源：[`packages/todo/tool-todo/src/index.ts`](../packages/todo/tool-todo/src/index.ts)
 
 todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。
+
+<a id="deepseek-aidsh-tool-workbench"></a>
+
+## `@deepseek-ai/dsh-tool-workbench`
+
+### `workbench_close`
+
+关闭共享工作台栏。选中的面板会为下一次打开保留。
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+来源：[`packages/workbench/tool-workbench/src/index.ts`](../packages/workbench/tool-workbench/src/index.ts)
+
+### `workbench_open`
+
+打开共享工作台栏，可按 id 选择面板。用户会在同一面板上看到该栏打开；本次调用不启动其它动作。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "panel": {
+      "type": "string",
+      "description": "Panel id to select. Omit to keep the current selection."
+    }
+  }
+}
+```
+
+来源：[`packages/workbench/tool-workbench/src/index.ts`](../packages/workbench/tool-workbench/src/index.ts)
+
+### `workbench_status`
+
+读取共享工作台视图：该栏是否打开、选中了哪个面板。
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+来源：[`packages/workbench/tool-workbench/src/index.ts`](../packages/workbench/tool-workbench/src/index.ts)
+
+该视图是进程全局的而非会话所有，因此每次调用都触及内置 `global` 资源，`workbench/changed` 把每份已提交视图同样带给浏览器与 agent。
 
 <a id="deepseek-aidsh-tool-working-directory"></a>
 

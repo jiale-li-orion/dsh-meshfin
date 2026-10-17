@@ -3,17 +3,17 @@
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/workbench.md
 /workbench:
-  en: 9385cf77f995a906
-  zh: 3c763fde417b2a34
+  en: 35eaae3cc86d58e3
+  zh: acb416f7b764b74b
 /workbench/shared-view:
   en: 37992cd3ee2bdc7c
   zh: 9861cecdc7d8ec1d
-/workbench/fenced-listing:
-  en: c19429394b190e70
-  zh: 8637ea08c6a50032
-/workbench/bytes-and-the-viewer:
-  en: 3b34306493b947c0
-  zh: a83f64598e261941
+/workbench/workspace-fence:
+  en: fbad223b845b6d37
+  zh: 08e9c9af85e60062
+/workbench/bytes:
+  en: 2e80b1c6cbb52376
+  zh: 5f9a5a69e2d155c2
 /workbench/events:
-  en: 5d61517c3a6037b0
-  zh: 8e3dec4a4fcf0817
+  en: 774776c811a10e47
+  zh: 80af121fa9ef8911

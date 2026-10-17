@@ -246,6 +246,8 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/web/web': { kind: 'indirect', reason: 'The provider registry delegates model rendering to dsh-tool-web.' },
   'packages/web/web-fetch-http': { kind: 'indirect', reason: 'The provider backend delegates model rendering to dsh-tool-web.' },
   'packages/web/web-search-exa': { kind: 'indirect', reason: 'The provider backend delegates model rendering to dsh-tool-web.' },
+  'packages/workbench/workbench': { kind: 'indirect', reason: 'The shared view and the workspace fence reach a model only as the notice dsh-tool-workbench returns; the package registers no prompt, schema, or event a model reads.' },
+  'packages/workbench/workbench-bytes': { kind: 'none', reason: 'The route streams workspace file bytes to the browser viewer; it registers no prompt, schema, or session event and returns no model-visible content.' },
   'packages/workflow/workflow': { kind: 'indirect', reason: 'The service delegates parent and child model rendering to its consumer and engine.' },
 }
 

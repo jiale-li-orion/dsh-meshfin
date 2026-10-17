@@ -2,7 +2,7 @@
 
 [English](workbench.md) | 中文
 
-`@deepseek-ai/dsh-workbench` 持有共享的工作台视图：工作台栏是否打开、选中了哪个面板。浏览器与 agent 都修改这同一个值——浏览器手势以 Remote 调用到达，`@deepseek-ai/dsh-tool-workbench` 通过 `workbench_open`／`workbench_close` 写入同一个值，每次提交都发出 `workbench/changed`，Web 客户端通过转发事件白名单消费它。该服务还回答文件面板的目录列举，以调用会话记录的工作目录为围栏、经 `ctx.fs` 解析；`@deepseek-ai/dsh-workbench-bytes` 用同一道围栏提供被列举文件的字节。
+`@deepseek-ai/dsh-workbench` 持有共享的工作台视图：工作台栏是否打开、选中了哪个面板。浏览器与 agent 都修改这同一个值——浏览器手势以 Remote 调用到达，`@deepseek-ai/dsh-tool-workbench` 通过 `workbench_open`／`workbench_close` 写入同一个值，每次提交都发出 `workbench/changed`，Web 客户端通过转发事件白名单消费它。该包还导出 `@deepseek-ai/dsh-workbench-bytes` 读取的三个值：工作区围栏 `fenceSessionPath`、扩展名到媒体类型的映射 `contentTypeForPath`，以及 `/api/workbench/file` 路由路径。
 
 来源：[`packages/workbench/workbench/src/types.ts`](../../packages/workbench/workbench/src/types.ts)
 
@@ -25,67 +25,27 @@ interface WorkbenchView {
 }
 ```
 
-## 受围栏保护的列举
+## 工作区围栏
 
-`listDir(sessionId, path)` 以会话记录的 `cwd` 为围栏，并经 `fs` 能力列举，因此面板看到的正是 agent 操作的那棵树，且不会超出它。没有记录工作目录的会话、或逃出该目录的路径，会以 `WORKBENCH_OUTSIDE_WORKSPACE` 被拒绝，而不是被服务。字节路由的请求由同一个 `fenceSessionPath` 解析，所以「面板能列出的路径」正好等于「查看器能流式读取的路径」。
+`fenceSessionPath(ctx, sessionId, path)` 经 `ctx.fs` 把一条路径解析到该会话记录的 `cwd` 之内：`path: null` 解析到根，相对路径相对记录目录解析，一次请求由下面这个二元组界定。没有记录工作目录的会话、或落在其外的目标，会抛出带 `WORKBENCH_OUTSIDE_WORKSPACE` 代码的 `WorkbenchFenceError`，而不是完成解析，因此拒绝会指明出问题的路径而不是把它送出去。`contentTypeForPath(path)` 把文件扩展名映射为字节路由作为 `Content-Type` 提供的媒体类型，扩展名未知或缺失时回答 `application/octet-stream`，因此两个平面都不必自行从文件名推导类型。
 
 ```ts type-equiv
-/** One child of a listed directory. */
-interface WorkbenchDirEntry {
-  /** Basename inside the listed directory. */
-  name: string
-  /** Whether the child is a regular file, a directory, or something else. */
-  type: 'file' | 'directory' | 'other'
-  /** Backend display path, safe to render. */
-  path: string
-  /** Byte size of a regular file when the backend reports one. */
-  size?: number
-  /**
-   * Media type of a regular file, chosen from its extension by
-   * `contentTypeForPath`; absent for directories and other entries. The viewer
-   * chain routes on it and the byte route serves it as `Content-Type`, so the
-   * browser never re-derives a type from the name.
-   */
-  mediaType?: string
+/** One fenced resolution: the workspace root and the requested target inside it. */
+interface FencedSessionPath {
+  /** The session's recorded working directory, resolved through `fs`. */
+  root: FsTarget
+  /** The requested path; equal to `root` when `path` was null. */
+  target: FsTarget
 }
 ```
 
-```ts type-equiv
-/**
- * One directory listing, fenced to a session's recorded working directory.
- * `root` is that directory; every entry path is inside it.
- */
-interface WorkbenchListing {
-  /** The session's recorded working directory the listing is fenced to. */
-  root: string
-  /** The listed directory (equal to `root` for the top level). */
-  path: string
-  /**
-   * Path prefix serving every entry's bytes, carrying no query. A client builds
-   * `fileRoute?sessionId=<id>&path=<entry path>` for the viewer, so the byte
-   * route's location has one home instead of a constant per plane.
-   */
-  fileRoute: string
-  /**
-   * Route a client POSTs an uploaded file to: `uploadRoute?sessionId=<id>&name=<name>`
-   * with the bytes as the body. The file lands in this workspace's `uploads/`
-   * directory and the response names the path it was written to.
-   */
-  uploadRoute: string
-  /** Children in backend order. */
-  entries: readonly WorkbenchDirEntry[]
-}
-```
+## 字节
 
-## 字节与查看器
-
-`@deepseek-ai/dsh-workbench-bytes` 注册一条 `webServer` 前缀（`/workbench/file`），把工作区文件流式送给浏览器。请求先过浏览器信任栅栏（`connection.isTrustedRequest`，即部署的 `trustedHosts` 策略），再过工作区栅栏，正文从解析出的目标进程路径流式输出而不是整文件读入：`Range` 请求返回 `206` 加 `content-range`，不可满足的范围返回 `416`，`HEAD` 只回头部。畸形、多范围或未知单位的请求头会被忽略并返回完整表示。
-
-查看器本身是工作台外壳声明的 `workbench.viewer` 链式座位：`@deepseek-ai/dsh-client-ui-workbench` 为每个媒体族（`image/*`、`audio/*`、`video/*`）注册一条，其选择器选中列举里的 `mediaType`，没有条目认领的类型落到外壳的「无预览」提示。某个窗口在预览哪个文件属于浏览器本地状态（外壳 store）；只有栏的开关与面板选择与 host 和 agent 共享。
+`@deepseek-ai/dsh-workbench-bytes` 在共享的 `/api` 通道上注册一条精确的 Fetch 路由（`WORKBENCH_FILE_PATH`），方法为 `GET` 与 `HEAD`。承载通道在处理器运行前套用自身的信任与认证策略，因此只有属主 Peer 能到达该路由；处理器随后套用工作区围栏。正文从解析出的目标的进程路径流式输出，而不是把文件整体读入：`Range` 请求回答 `206` 并带 `content-range`，不可满足的范围回答 `416`，`HEAD` 只回头部不带正文。畸形、多范围或未知单位的请求头会被忽略并返回完整表示；缺少 `sessionId` 或 `path` 回答 `400`，被围栏拒绝的路径回答 `403`，目标不是普通文件则回答 `404`。
 
 ## 事件
 
-`workbench/changed` 在每次提交时携带已提交的视图。该事件是单向、仅载荷的，因此转发事件白名单可以把它原样投递给浏览器；不变式伴随插件断言每个载荷都等于服务持有的状态。
+`workbench/changed` 在每次提交时携带已提交的视图。该事件是单向、仅载荷的，因此转发事件白名单可以把它原样投递给浏览器。
 
 <!-- BEGIN GENERATED cordis-surface (gen-cordis-catalog.ts) — do not edit between markers -->
 

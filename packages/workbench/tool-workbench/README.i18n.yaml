@@ -2,12 +2,24 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/workbench/tool-workbench/README.md
+/:
+  en: bc41a236b2bc36d8
+  zh: c3f5dd5c92f5174a
 /deepseek-ai-dsh-tool-workbench:
-  en: e2d5f104d34697ed
-  zh: c97e471698f6778d
+  en: 4b2d3459d3ffcb69
+  zh: 8a5a7436cc8e8f61
+/deepseek-ai-dsh-tool-workbench/summary:
+  en: 116a67db8fdbc05f
+  zh: 9cf33926eabceba6
+/deepseek-ai-dsh-tool-workbench/table-of-contents:
+  en: 90a11b70f4d34cdf
+  zh: 4f68c6ad67c7a434
+/deepseek-ai-dsh-tool-workbench/tools:
+  en: 3cd9d4473c7070d6
+  zh: 1ff60632837f1a94
 /deepseek-ai-dsh-tool-workbench/model-experience:
   en: 215e7ba838619b7b
-  zh: a311da3843709f90
+  zh: 215e7ba838619b7b
 /deepseek-ai-dsh-tool-workbench/model-experience/tool-schemas:
   en: 3039bc5e7a796b21
   zh: 6b7a9eaf69c9ea53
@@ -33,5 +45,8 @@
   en: f5d5f97a153f7c70
   zh: 74ee91dded5baf1e
 /deepseek-ai-dsh-tool-workbench/known-limitations-and-deferred-work:
-  en: 6214999444b20f90
-  zh: 4698ba06aa1a2dc4
+  en: a7243ad5d4eee0b4
+  zh: 8c442c95b916b641
+/deepseek-ai-dsh-tool-workbench/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 19552bf86462c38f

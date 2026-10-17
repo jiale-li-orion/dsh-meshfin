@@ -2,7 +2,7 @@
 
 English | [中文](session-context.zh.md)
 
-The current model-visible Session surface as an inspectable and replaceable product capability. [`@deepseek-ai/dsh-session-context`](../../packages/session/session-context) owns the Host service and Remote types; the [implemented decision](../../.agents/notes/implemented/feature/2026-08-16-session-context-management.md) owns why Chat, Context, and Trajectory remain separate projections.
+The current model-visible Session surface as an inspectable and replaceable product capability. [`@deepseek-ai/dsh-session-context`](../../packages/session/session-context) owns the Host service and Remote types. It reads `Session.surface` rather than the paged human transcript, so Context, Chat, and Trajectory stay separate projections of one append-only log.
 
 Source: [`packages/session/session-context/src/types.ts`](../../packages/session/session-context/src/types.ts)
 
@@ -12,8 +12,8 @@ Source: [`packages/session/session-context/src/types.ts`](../../packages/session
 /** Bounded metadata for one indivisible current-surface unit. */
 interface ContextUnit {
   readonly id: ContextUnitId
-  readonly startSeq: number
-  readonly endSeq: number
+  readonly startSeq: SessionSeq
+  readonly endSeq: SessionSeq
   readonly kind: ContextUnitKind
   readonly role: ContextUnitRole
   readonly tokenCount: number
@@ -29,10 +29,12 @@ interface ContextUnit {
 /** Current durable model-surface snapshot for one live Agent. */
 interface ContextSnapshot {
   readonly sessionId: SessionId
-  readonly logRevision: number
+  /** Events consumed by this capture; equal to the Session's next event seq. */
+  readonly logRevision: SessionLogOffset
   readonly replaceGeneration: number
-  readonly generationSeq: number | null
-  readonly tailSeq: number | null
+  /** Seq of the latest positional surface replacement, or null for the initial generation. */
+  readonly generationSeq: SessionSeq | null
+  readonly tailSeq: SessionSeq | null
   readonly totalTokens: number
   readonly surfaceTokens: number
   readonly route?: { readonly provider: string; readonly model: string }
@@ -53,8 +55,8 @@ Units follow current surface order and end only at tool-balanced cuts. `unitOffs
 interface ContextPreparation {
   readonly preparationId: CompactionPreparationId
   readonly status: ContextPreparationStatus
-  readonly startSeq: number
-  readonly endSeq: number
+  readonly startSeq: SessionSeq
+  readonly endSeq: SessionSeq
   readonly unitCount: number
   readonly shadowedTokenCount: number
   readonly preservationBrief?: string
@@ -78,11 +80,10 @@ interface ContextPreparation {
 /** Structured same-Session rewrite request from UI or another trusted consumer. */
 interface ContextRewriteRequest {
   readonly unitId: ContextUnitId
-  readonly expectedTailSeq: number
+  readonly expectedTailSeq: SessionSeq
   readonly mode: ContextRewriteMode
   /** Replacement prose; the Host retains image blocks from the selected current message. */
   readonly text: string
-  readonly continue: boolean
 }
 ```
 
@@ -90,15 +91,14 @@ interface ContextRewriteRequest {
 /** Committed rewrite result. */
 interface ContextRewriteResult {
   readonly rewriteId: ContextRewriteId
-  readonly replacementSeq: number
-  readonly previousGenerationSeq: number | null
+  readonly replacementSeq: SessionSeq
+  readonly previousGenerationSeq: SessionSeq | null
   readonly shadowedItemCount: number
   readonly shadowedTokenCount: number
-  readonly contextRunId?: ContextRunId
 }
 ```
 
-`edit-and-continue` replaces the selected unit through the loaded tail. `patch` replaces one balanced unit. The Host validates the unit, tail, edit authority, and image retention before append; `continue` requests a separate durable context run after flush.
+`edit-and-continue` replaces the selected unit through the loaded tail. `patch` replaces one balanced unit. The Host validates the unit, tail, edit authority, and image retention before append, then appends the replacement user message and one `context/rewrite` record stating the exact shadowed surface. The rewrite starts no model turn: the replacement is current context for the next request the Agent serves.
 
 ## Checkpoint recall
 
@@ -106,8 +106,9 @@ interface ContextRewriteResult {
 /** One canonical fragment of an original model-visible message. */
 interface ContextHistoryEntry {
   readonly checkpointId: CompactionId
-  readonly seq: number
-  readonly role: 'user' | 'assistant'
+  readonly seq: SessionSeq
+  /** Model role of the recalled original; upstream keeps tool results as their own messages. */
+  readonly role: Message['role']
   /** UTF-16 offset in the canonical serialized message. */
   readonly offset: number
   readonly text: string
@@ -130,7 +131,7 @@ interface ContextHistoryReadResult {
 /** One checkpoint-addressed literal match. */
 interface ContextHistorySearchMatch {
   readonly checkpointId: CompactionId
-  readonly seq: number
+  readonly seq: SessionSeq
   /** UTF-16 offset in the canonical serialized message. */
   readonly offset: number
   readonly snippet: string

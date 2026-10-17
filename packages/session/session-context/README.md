@@ -120,8 +120,9 @@ Zero direct tokens from Host reads. A consumer that sends recalled content to th
 
 Host reads do not affect cache state. Recalled tool results append after the existing request prefix.
 
-<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
+
+<a id="known-limitations-and-deferred-work"></a>
 
 - **Live Agent required** — Remote lookup addresses an Agent-backed Session; this service does not inspect an arbitrary persisted-but-unloaded log directly.
 - **Literal in-session recall only** — search has no regex, semantic ranking, or cross-session index.
