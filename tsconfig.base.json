@@ -366,6 +366,7 @@
       "@deepseek-ai/dsh-workbench": ["./packages/workbench/workbench/src/index.ts"],
       "@deepseek-ai/dsh-workbench/types": ["./packages/workbench/workbench/src/types.ts"],
       "@deepseek-ai/dsh-tool-workbench": ["./packages/workbench/tool-workbench/src/index.ts"],
+      "@deepseek-ai/dsh-workbench-bytes": ["./packages/workbench/workbench-bytes/src/index.ts"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp-app": ["./packages/bundle/acp-app/src"],

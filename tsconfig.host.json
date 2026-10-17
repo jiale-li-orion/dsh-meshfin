@@ -536,5 +536,6 @@
     { "path": "./apps/desktop/tsconfig.host.json" }
   ,
     { "path": "./packages/workbench/workbench" },
-    { "path": "./packages/workbench/tool-workbench" }]
+    { "path": "./packages/workbench/tool-workbench" },
+    { "path": "./packages/workbench/workbench-bytes" }]
 }
