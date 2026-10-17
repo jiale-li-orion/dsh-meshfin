@@ -2,9 +2,18 @@
 # section, a hash of its English and Chinese blocks outside code blocks and generated regions.
 # After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-context/README.md
+/:
+  en: 85299b9531738985
+  zh: 45a45734139e966e
 /deepseek-ai-dsh-client-ui-context:
   en: acc2296d089ad31b
   zh: e0f44826395b6b43
+/deepseek-ai-dsh-client-ui-context/table-of-contents:
+  en: 7ad714b8d6838e07
+  zh: 6f63fbd4938866de
+/deepseek-ai-dsh-client-ui-context/summary:
+  en: 424e42af6b90e151
+  zh: 6ff8dbaf5f3b10fa
 /deepseek-ai-dsh-client-ui-context/user-workflow:
   en: d2270a7af8aa09d0
   zh: 6742779c14807b48
@@ -15,11 +24,11 @@
   en: 00d1bd192aafbac3
   zh: b92c840b22f46a2c
 /deepseek-ai-dsh-client-ui-context/user-workflow/recall-checkpoint-originals:
-  en: 59f43d73b985e411
-  zh: eb759e41f99e010c
+  en: a309c86584d40f90
+  zh: 8f020af3640a5ae3
 /deepseek-ai-dsh-client-ui-context/architecture:
   en: dcec295c441b98e2
-  zh: 3761a7ed580dc67c
+  zh: b9c72886c15f2937
 /deepseek-ai-dsh-client-ui-context/model-experience:
   en: 215e7ba838619b7b
   zh: a311da3843709f90
@@ -46,7 +55,10 @@
   zh: fb8d2e5ad1d59324
 /deepseek-ai-dsh-client-ui-context/model-experience/human-rewrite-and-compaction-actions/kv-cache-effect:
   en: 4b5fe2cf5cbcee2c
-  zh: 0e44064d10817b06
+  zh: 476e03159ecfc73e
 /deepseek-ai-dsh-client-ui-context/known-limitations-and-deferred-work:
   en: c53a9dab01afb389
-  zh: 9f3b9a21c32117b2
+  zh: 66bdaa0da29f2f18
+/deepseek-ai-dsh-client-ui-context/known-limitations-and-deferred-work/dev-note:
+  en: 0a1253c6f7b5e8b9
+  zh: 9f56528562c7c914

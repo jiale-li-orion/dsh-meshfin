@@ -18,7 +18,7 @@ kind: "package-reference"
 - [进一步探索](#further-exploration)
 - [模型体验](#model-experience)
 - [已知限制与延期工作](#known-limitations-and-deferred-work)
-- [开发者备注](#dev-note)
+- [开发备注](#dev-note)
 
 -----
 
@@ -96,7 +96,7 @@ kind: "package-reference"
 - **控制行没有渲染测试。** 它的面经注入工厂覆盖；它绘制的元素仅由预览自己的组件 spec 覆盖。
 
 <a id="dev-note"></a>
-### 开发者备注
+### 开发备注
 
 <details>
 <summary>维护者工作上下文——点击展开</summary>

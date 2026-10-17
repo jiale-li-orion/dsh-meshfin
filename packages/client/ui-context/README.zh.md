@@ -1,9 +1,29 @@
+---
+description: "Context Conversation View：一个会话下一次模型请求由哪些单元构成、对可编辑单元的一次持久改写，以及提交前对已准备压缩的审阅。"
+kind: "package-reference"
+---
+
 # `@deepseek-ai/dsh-client-ui-context`
 
 [English](README.md) | 中文
 
 用于检查和修改当前模型 Context、同时保持仅追加来源 Chat transcript（文本记录）不变的浏览器插件。它贡献 Context Conversation View、输入框上下文占用面板中的一项操作、Chat 改写标记，以及每 Session 控制器和查看状态。
 
+## 目录
+
+- [概述](#summary)
+- [用户流程](#user-workflow)
+- [架构](#architecture)
+- [模型体验](#model-experience)
+- [已知限制与延后工作](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+<a id="summary"></a>
+## 概述
+
+与 Chat 并列的 Context Conversation View 展示下一次模型请求由哪些单元构成，允许对一个可编辑单元做持久改写，并在提交前审阅已准备的压缩。
+
+<a id="user-workflow"></a>
 ## 用户流程
 
 Context 作为 Conversation View 与 Chat 并列，位于 Session 头部的 View 切换条。标题区展示当前 Context 版本、已路由提供方／模型、单元数，以及对话消息、系统提示词、工具 schema 与估算总量的 token 估算。
@@ -30,6 +50,7 @@ Chat 保留每条原始记录，并增加链接回 Context 的持久“模型上
 
 检查点详情抽屉展示带框架摘要，并提供递归原始消息分页和字面搜索。原始消息与搜索结果分区展示。读取与搜索可以通过不透明游标继续，而无需一次加载完整来源记录。
 
+<a id="architecture"></a>
 ## 架构
 
 `SessionContextController` 是负责 Remote 调用、取消、去重、陈旧页面修复和不可变输出的 React-free 对象层。它只在 Context 视图挂载时订阅 Session 的 `contextPressure` projection，并在该宿主计算的提示词数值变化时刷新——当前表面增减计价节点时，这个数值恰好会变。preparation 变更在结算后显式刷新。
@@ -40,6 +61,7 @@ Slot 注册拥有一份按 Session 持久化的查看 store，保存选择、详
 
 插件通过所属 fiber 注册全部 contribution。卸载会移除 Context View、占用面板操作、Chat renderer、Conversation Definition、字典、控制器和 store，但不会改变宿主 Session 数据。
 
+<a id="model-experience"></a>
 ## 模型体验
 
 ### Context 检查 UI
@@ -70,9 +92,15 @@ Slot 注册拥有一份按 Session 持久化的查看 store，保存选择、详
 
 所调用宿主替换会保留变更表层位置之前的复用，并从该位置开始使复用失效。UI 草稿以及失败或已丢弃的 preparation 不影响 cache。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与延后工作
 
 - **仅当前代际** — Chat 与 Trajectory 会保留过去证据，但 Context tab 尚不能切换历史代际或把某一代重新设为当前代。
 - **只能选择已加载范围** — 范围只能包含虚拟列表中当前已加载的单元；用户必须先加载较早页面。
 - **没有语义召回 UI** — 检查点搜索与宿主能力一致，只支持会话内字面搜索。
 - **不能撤销执行世界** — 警告会说明上下文变更无法还原外部副作用。
+
+<a id="dev-note"></a>
+### 开发备注
+
+无。

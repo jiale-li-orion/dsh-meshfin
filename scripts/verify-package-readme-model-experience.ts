@@ -48,6 +48,7 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/experimental/client-ui-cot-translation': { kind: 'indirect', reason: 'The translator owns optional paid queries; normal Session activation delegates startup context to the preset.' },
   'packages/experimental/cot-translation-bundle': { kind: 'indirect', reason: 'The GUI consumer delegates paid query prompts to the translator and normal activation context to the Session preset.' },
   'packages/client/product-analytics': { kind: 'none', reason: 'Desktop analytics observes selected interactions without contributing model context or Session events.' },
+  'packages/client/ui-workbench': { kind: 'none', reason: 'Renders the Host-owned workbench view and one byte-route preview; the model-facing control stays with tool-workbench.' },
   'packages/experimental/speech-to-text': { kind: 'none', reason: 'Routes transient recognition without adding model requests or Session events.' },
   'packages/experimental/api-speech-to-text': { kind: 'none', reason: 'Transports audio and preparation state; ordinary user submission owns model-visible text.' },
   'packages/experimental/speech-to-text-sensevoice': { kind: 'none', reason: 'Local recognition returns transient text without modifying model context.' },

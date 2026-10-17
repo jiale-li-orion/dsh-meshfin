@@ -1,8 +1,26 @@
+---
+description: "The Context Conversation View: the units a session's next model request is built from, one durable rewrite of an editable unit, and the review of a prepared compaction before it commits."
+kind: "package-reference"
+---
+
 # `@deepseek-ai/dsh-client-ui-context`
 
 English | [中文](README.zh.md)
 
 Browser plugin for inspecting and changing the current model Context without changing the append-origin Chat transcript. It contributes the Context Conversation View, an action inside the composer's context-occupancy panel, a Chat rewrite marker, and per-Session controller and viewing state.
+
+## Table of Contents
+
+- [Summary](#summary)
+- [User workflow](#user-workflow)
+- [Architecture](#architecture)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+## Summary
+
+A Conversation View beside Chat shows the units the next model request is built from, lets one editable unit be rewritten durably, and reviews a prepared compaction before it is committed.
 
 ## User workflow
 
@@ -28,7 +46,7 @@ Closing the dialog preserves the durable preparation and local summary draft; a 
 
 ### Recall checkpoint originals
 
-A checkpoint detail drawer shows the framed summary and offers recursive original-message paging plus literal search. Original messages and search results have separate sections. Reads and searches can continue through opaque cursors without loading the complete provenance at once.
+A checkpoint detail drawer shows the framed summary and offers recursive original-message paging plus literal search. Original messages and search results have separate sections. Reads and searches can continue through opaque cursors instead of materializing every original at once.
 
 ## Architecture
 
@@ -76,3 +94,7 @@ The invoked Host replacement preserves reuse before the changed surface position
 - **Loaded-range selection** — a range can include only units currently loaded in the virtual list; the user must load earlier pages before selecting them.
 - **No semantic recall UI** — checkpoint search is literal and in-session, matching the Host capability.
 - **No execution-world undo** — the warnings disclose that context changes cannot revert external effects.
+
+### Dev Note
+
+None.
