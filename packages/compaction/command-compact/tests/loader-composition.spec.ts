@@ -41,6 +41,14 @@ class LoaderCompactionEngine extends CompactionEngine {
     return Promise.resolve(null)
   }
 
+  override prepareRegion(): Promise<never> {
+    return Promise.reject(new Error('this stub never prepares a region'))
+  }
+
+  override commitPrepared(): Promise<never> {
+    return Promise.reject(new Error('this stub never commits a preparation'))
+  }
+
   override compactRegion(): Promise<CompactionResult> {
     return Promise.resolve(RESULT)
   }
