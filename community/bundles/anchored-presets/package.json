@@ -1,0 +1,47 @@
+{
+  "name": "@muwinds/dsh-anchored-presets",
+  "version": "0.3.0",
+  "description": "Seven anchored agent presets for DeepSeek Harness, shipped as one bundle: declaration rows plus the helper plugin rows they mount. · DSH 的七个 anchored 智能体预设，以单个 bundle 分发：声明行 + 它们挂载的助手插件行。",
+  "type": "module",
+  "scripts": {
+    "build-patch": "node scripts/build-patch.mjs",
+    "test": "TSX_TSCONFIG_PATH=../../../tsconfig.base.json node --import tsx/esm --test test/*.test.mjs"
+  },
+  "exports": {
+    "./helpers/*.mjs": "./helpers/*.mjs",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "helpers/*.mjs",
+    "helpers/template.jsonl",
+    "helpers/template.jsonl.meta.json",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "agent-presets",
+    "anchored"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MuWinds/dsh-archived-sessions.git"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.5"
+  }
+}

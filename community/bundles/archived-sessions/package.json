@@ -1,0 +1,54 @@
+{
+  "name": "@muwinds/dsh-archived-sessions",
+  "version": "0.3.0",
+  "description": "Archived-sessions manager for the DeepSeek Harness web UI: list archived sessions in Settings, restore them through the Workspace Remote, and preview one stored log. · DSH 归档会话管理：设置页查看、释放已归档会话并预览会话内容。",
+  "type": "module",
+  "scripts": {
+    "test": "TSX_TSCONFIG_PATH=../../../tsconfig.base.json node --import tsx/esm --test test/*.test.mjs"
+  },
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "archived-sessions",
+    "session-management"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MuWinds/dsh-archived-sessions.git"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-api-session-controller",
+        "@deepseek-ai/dsh-api-workspace-controller",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-ui-slots"
+      ],
+      "platform": "web"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.5"
+  }
+}

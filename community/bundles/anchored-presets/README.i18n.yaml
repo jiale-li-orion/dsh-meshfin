@@ -1,0 +1,31 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write community/bundles/anchored-presets/README.md
+/dsh-anchored-presets:
+  en: 5feb7cb56ae2c8b4
+  zh: 2b447aab6b7f8749
+/dsh-anchored-presets/how-upstream-0-2-1-rc-2-carries-a-preset:
+  en: 9a494e99e1a5eb18
+  zh: deb4abf6a58e622f
+/dsh-anchored-presets/layout:
+  en: 38571ff90a7df3c9
+  zh: 797f4a6381f226b5
+/dsh-anchored-presets/why-the-helpers-are-package-subpaths:
+  en: d1fd9f90d947a620
+  zh: b58fbf827ee3946b
+/dsh-anchored-presets/conversions-applied-when-emitting-the-patch:
+  en: 08f7ffa95b170375
+  zh: 9193fca4749faaee
+/dsh-anchored-presets/install:
+  en: 3a2a7101dac54700
+  zh: 058bfdb4fc07354a
+/dsh-anchored-presets/tests:
+  en: 6609808a022cd01e
+  zh: bc64efea56738193
+/dsh-anchored-presets/compatibility:
+  en: 499f0031ccee2045
+  zh: bccd87ac30060c12
+/dsh-anchored-presets/license:
+  en: aa1c6eede4415a3e
+  zh: 728afe24e3c8449c
