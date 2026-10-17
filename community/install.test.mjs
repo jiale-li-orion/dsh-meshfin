@@ -97,6 +97,7 @@ test('--update removes an installed bundle before adding it again', async (t) =>
     'remove @muwinds/dsh-archived-sessions',
     `add ${join(communityDirectory, 'bundles', 'archived-sessions')}`,
     `add ${join(communityDirectory, 'bundles', 'anchored-presets')}`,
+    `add ${join(communityDirectory, 'bundles', 'meshfin-surface')}`,
   ])
   assert.deepEqual(steps[0].args.slice(3), ['plugin', '--profile', 'web', 'remove', '@muwinds/dsh-archived-sessions'])
 })
@@ -108,6 +109,7 @@ test('--update still installs a bundle the profile does not depend on', async (t
   assert.deepEqual(steps.map((step) => step.describe), [
     `add ${join(communityDirectory, 'bundles', 'archived-sessions')}`,
     `add ${join(communityDirectory, 'bundles', 'anchored-presets')}`,
+    `add ${join(communityDirectory, 'bundles', 'meshfin-surface')}`,
   ])
 })
 

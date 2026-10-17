@@ -29,6 +29,7 @@ const repositoryDirectory = resolve(communityDirectory, '..')
 export const BUNDLES = Object.freeze([
   Object.freeze({ directory: 'archived-sessions', packageName: '@muwinds/dsh-archived-sessions' }),
   Object.freeze({ directory: 'anchored-presets', packageName: '@muwinds/dsh-anchored-presets' }),
+  Object.freeze({ directory: 'meshfin-surface', packageName: '@muwinds/dsh-meshfin-surface' }),
 ])
 
 /** Source-mode `dsh` entry point, used when `--dsh-command` is omitted. */

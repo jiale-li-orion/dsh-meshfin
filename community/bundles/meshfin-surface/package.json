@@ -1,0 +1,36 @@
+{
+  "name": "@muwinds/dsh-meshfin-surface",
+  "version": "0.1.0",
+  "description": "This distribution's own surface as one optional bundle: the context view with its review-and-rewrite tools, and the workbench view the browser and the agent share. \u00b7 \u672c\u53d1\u884c\u7684\u81ea\u6709\u80fd\u529b\u5305\uff1a\u4e0a\u4e0b\u6587\u89c6\u56fe\uff08\u542b\u5ba1\u9605\u4e0e\u6539\u5199\u5de5\u5177\uff09\u4e0e\u6d4f\u89c8\u5668\u548c\u667a\u80fd\u4f53\u5171\u4eab\u7684\u5de5\u4f5c\u53f0\u89c6\u56fe\u3002",
+  "type": "module",
+  "exports": {
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "cordis.patch.yml",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "dsh-plugin",
+    "meshfin",
+    "context",
+    "workbench"
+  ],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "engines": {
+    "dsh": ">=0.2.1-rc.2 <0.3.0"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.5"
+  }
+}

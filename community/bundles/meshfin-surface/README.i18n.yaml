@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write community/bundles/meshfin-surface/README.md
+/muwinds-dsh-meshfin-surface:
+  en: f1e3d3b8abe22a89
+  zh: a2c7c420a15a8e16
+/muwinds-dsh-meshfin-surface/use-this-package:
+  en: c324e4fce5ff7ce0
+  zh: 10997082cb6c3adf
+/muwinds-dsh-meshfin-surface/what-each-surface-means:
+  en: 2810c880b3a99033
+  zh: 9c86efafdca82000
+/muwinds-dsh-meshfin-surface/known-limitations-and-deferred-work:
+  en: 78203ca37c66ec91
+  zh: b6d50976098ce5d9
+/muwinds-dsh-meshfin-surface/dev-note:
+  en: b75c8458928b72b9
+  zh: 003ba4e17b4b5269
