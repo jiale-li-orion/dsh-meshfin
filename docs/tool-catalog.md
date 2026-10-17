@@ -37,12 +37,14 @@ This table connects model-visible tool names to the plugin package and service s
 | `@deepseek-ai/dsh-tool-lsp` | `lsp` | `ctx.workingDirectory`, `ctx.tools`, `ctx.lsp`, `ctx.systemPrompt` | `tool/call`, `tool/result` | - | The lsp tool keeps provider selection and language-server subprocesses behind ctx.lsp, so its model-visible schema stays stable across providers. Requires a registered provider (e.g. `@deepseek-ai/dsh-lsp-stdio`) at runtime; without one, a query returns the structured `LSP_UNAVAILABLE` error rather than changing the schema. |
 | `@deepseek-ai/dsh-tool-ralph` | `ralph` | `ctx.tools`, `ctx.workflowEngine`, `ctx.subagents`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents every fresh round)` | `tool/call`, `tool/result`, `workflow and child session events during execution` | - | A fixed foreground workflow starts one fresh structured child per round; the model selects only the immutable objective and an optional round cap. |
 | `@deepseek-ai/dsh-tool-skill` | `skill` | `ctx.workingDirectory`, `ctx.tools`, `ctx.agents`, `ctx.skills` | `tool/call`, `tool/result`, `user/message replacement catalogs via agent.inject()` | - | - |
+| `@deepseek-ai/dsh-tool-session-context` | `context_commit`, `context_discard_preparation`, `context_edit_preparation`, `context_inspect`, `context_prepare`, `context_read`, `history_read`, `history_search` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionContext`, `a calling Agent` | `tool/call`, `compaction/preparation/* plus one compaction bracket on commit`, `tool/result` | - | The five `context_*` tools run against the calling Agent. `context_prepare` records a reviewable summary without changing context; only `context_commit` replaces the selected range, and the originals stay recallable. `history_read` and `history_search` take a checkpoint id from `context_inspect`. |
 | `@deepseek-ai/dsh-tool-session-query` | `session_event_read`, `session_event_search`, `session_event_trace`, `session_search`, `session_trace` | `ctx.tools`, `ctx.systemPrompt`, `ctx.sessionQuery`, `a calling Agent for workspace authority` | `tool/call`, `tool/result` | - | The five read-only tools hide provider cursors and authorize every result from the immutable calling agent session. The package is opt-in; compositions that need enforced deadlines or bounded inline output also mount the generic timeout or spill policies. |
 | `@deepseek-ai/dsh-tool-subagent` | `list_subagent_models`, `subagent` | `ctx.tools`, `ctx.subagents`, `ctx.systemPrompt`, `ctx.llm for model discovery and selected-route validation` | `tool/call`, `tool/result`, `child session events through the chosen provider` | `subagent`, `subagent_fork` | The registered delegation name is the load-time `toolName` config (default `subagent`); the default schema above has model selection off, while the discovery schema is shown as the fixed companion available in an enabled Session. Web presets sample the Plugins preference for each new top-level Session and preserve that decision for its child Sessions; `subagent_fork` remains fixed-route. Each instance selects its backend through `provider` and reads model-selection settings through `modelSelectionSettings`. Every delegation returns a child id promptly; local children accept follow-ups, while external backends report their single execution automatically. |
 | `@deepseek-ai/dsh-tool-subagent-control` | `interrupt_agent`, `list_agents`, `send_message` | `ctx.tools`, `ctx.subagents`, `ctx.agents and ctx.sessionProjections (list_agents only)` | `tool/call`, `tool/result`, `child session events through ctx.subagents` | - | The globally named discovery, interruption, and local-message tools over managed subagents: provider-bound `tool-subagent` instances register distinct delegation tools, while this package registers `send_message` and `interrupt_agent` once, plus `list_agents` from its separately loaded `/list-agents` plugin (whose catalog rows use the sessionProjections and live Agent registries). |
 | `@deepseek-ai/dsh-tool-jobs` | `job_kill`, `job_list`, `job_output` | `ctx.tools`, `ctx.jobs`, `ctx.systemPrompt` | `tool/call`, `tool/result`, `user/message via agent.inject() for background completion notices` | - | The kind-agnostic background-job controller: background bash commands and PTY sends are read, listed, and killed through the same three tools. Loading the plugin attaches the controller that arms producers' `ctx.jobs.start()`. |
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | `interrupt_agent`, `list_agents`, `send_message`, `spawn_teammate`, `team_task_create`, `team_task_get`, `team_task_list`, `team_task_update`, `wait_agent` | `ctx.tools`, `ctx.systemPrompt`, `ctx.agentTeams`, `an exact live Team member Agent` | `tool/call`, `team/member`, `team/task`, `agent/inbox/spliced`, `user/message on inbox claim`, `tool/result` | - | All nine tools are scoped to implicit Team Leads and durable teammates. The shipped dsh-base bundle keeps the package disabled; the documented Agent Teams profile patch enables it while disabling the legacy continuable-child control names. |
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`, `owning Agent session` | `tool/call`, `todo/write`, `tool/result` | - | todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task. |
+| `@deepseek-ai/dsh-tool-workbench` | `workbench_close`, `workbench_open`, `workbench_status` | `ctx.tools`, `ctx.workbench` | `tool/call`, `tool/result` | - | The view is process-global rather than session-owned, so every call touches the built-in `global` resource and `workbench/changed` carries each committed view to the browser and the agent alike. |
 | `@deepseek-ai/dsh-tool-working-directory` | `working_directory` | `ctx.tools`, `ctx.workingDirectory` | `tool/call`, `working-directory/change`, `user context for directory changes`, `tool/result` | - | Reads or changes the calling Session directory. Existing shells and processes retain their own directories; origin metadata and permission roots stay fixed. |
 | `@deepseek-ai/dsh-experimental-tool-worktree` | `create_worktree` | `ctx.tools`, `ctx.worktrees`, `a calling Agent` | `tool/call`, `Git branch and checkout`, `working-directory/change`, `tool/result` | - | Explicit experimental composition only. Creates a new branch and checkout from a pinned local commit under existing write permissions, then changes the Session directory. Leaving retains the branch and checkout. |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`, `ctx.workflowEngine`, `ctx.systemPrompt`, `a calling Agent (exec.agent parents the script children)` | `tool/call`, `tool/result` | - | - |
@@ -1827,6 +1829,220 @@ Load the full instructions for a skill. Call it before acting on a task that nam
 
 Source: [`packages/skill/tool-skill/src/index.ts`](../packages/skill/tool-skill/src/index.ts)
 
+<a id="deepseek-aidsh-tool-session-context"></a>
+
+## `@deepseek-ai/dsh-tool-session-context`
+
+### `context_commit`
+
+Commit one reviewed preparation inside the current turn. This replaces its exact range in future model context; originals remain recallable in the append-only log.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "preparation_id": {
+      "type": "string",
+      "description": "Ready preparation id."
+    }
+  },
+  "required": [
+    "preparation_id"
+  ]
+}
+```
+
+Source: [`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `context_discard_preparation`
+
+Discard one ready or failed preparation without changing current context.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "preparation_id": {
+      "type": "string",
+      "description": "Preparation id to discard."
+    }
+  },
+  "required": [
+    "preparation_id"
+  ]
+}
+```
+
+Source: [`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `context_edit_preparation`
+
+Replace the review summary of one ready preparation. This still does not change current context.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "preparation_id": {
+      "type": "string",
+      "description": "Opaque preparation id from context_prepare or context_inspect."
+    },
+    "summary": {
+      "type": "string",
+      "description": "Complete replacement checkpoint Markdown."
+    }
+  },
+  "required": [
+    "preparation_id",
+    "summary"
+  ]
+}
+```
+
+Source: [`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `context_inspect`
+
+Inspect the exact current model-visible context as balanced units, token prices, generations, checkpoints, and pending reviewed preparations.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "before_index": {
+      "type": "integer",
+      "description": "Exclusive unit index for an earlier page. Omit to read the current tail."
+    },
+    "limit": {
+      "type": "integer",
+      "description": "Maximum units to return, capped at 100."
+    }
+  }
+}
+```
+
+Source: [`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `context_prepare`
+
+Generate and durably record a reviewable summary for a contiguous balanced unit range without changing current context.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "start_unit_id": {
+      "type": "string",
+      "description": "First unit id from context_inspect."
+    },
+    "end_unit_id": {
+      "type": "string",
+      "description": "Last unit id from context_inspect."
+    },
+    "preservation_brief": {
+      "type": "string",
+      "description": "Exact facts, literals, or artifacts the summary must preserve."
+    }
+  },
+  "required": [
+    "start_unit_id",
+    "end_unit_id"
+  ]
+}
+```
+
+Source: [`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `context_read`
+
+Read the complete current content of one unit_id returned by context_inspect.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "unit_id": {
+      "type": "string",
+      "description": "Opaque current Context unit id."
+    }
+  },
+  "required": [
+    "unit_id"
+  ]
+}
+```
+
+Source: [`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `history_read`
+
+Read a bounded page of exact originals shadowed by one checkpoint, optionally expanding nested checkpoints recursively.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "checkpoint_id": {
+      "type": "string",
+      "description": "Checkpoint id from context_inspect."
+    },
+    "cursor": {
+      "type": "string",
+      "description": "Opaque nextCursor from the previous history_read page."
+    },
+    "recursive": {
+      "type": "boolean",
+      "description": "Expand nested checkpoints. Defaults to true."
+    }
+  },
+  "required": [
+    "checkpoint_id"
+  ]
+}
+```
+
+Source: [`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+### `history_search`
+
+Search exact originals reachable from one checkpoint with a bounded literal query.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "checkpoint_id": {
+      "type": "string",
+      "description": "Checkpoint id from context_inspect."
+    },
+    "query": {
+      "type": "string",
+      "description": "Literal text to find."
+    },
+    "cursor": {
+      "type": "string",
+      "description": "Opaque nextCursor from the previous search page."
+    },
+    "case_sensitive": {
+      "type": "boolean",
+      "description": "Use exact case. Defaults to false."
+    },
+    "recursive": {
+      "type": "boolean",
+      "description": "Search nested checkpoints. Defaults to true."
+    }
+  },
+  "required": [
+    "checkpoint_id",
+    "query"
+  ]
+}
+```
+
+Source: [`packages/session/tool-session-context/src/index.ts`](../packages/session/tool-session-context/src/index.ts)
+
+The five `context_*` tools run against the calling Agent. `context_prepare` records a reviewable summary without changing context; only `context_commit` replaces the selected range, and the originals stay recallable. `history_read` and `history_search` take a checkpoint id from `context_inspect`.
+
 <a id="deepseek-aidsh-tool-session-query"></a>
 
 ## `@deepseek-ai/dsh-tool-session-query`
@@ -2607,6 +2823,56 @@ Record and update a task list to plan multi-step work and show progress; skip it
 Source: [`packages/todo/tool-todo/src/index.ts`](../packages/todo/tool-todo/src/index.ts)
 
 todo_write is session-owned state; UIs render the latest todo/write event as a checklist. `allowParallelInProgress` is required with no default, so the catalog states its choice: `true`, whose description invites several `in_progress` items. A deployment choosing `false` receives the same tool with a description asking for exactly one active task.
+
+<a id="deepseek-aidsh-tool-workbench"></a>
+
+## `@deepseek-ai/dsh-tool-workbench`
+
+### `workbench_close`
+
+Close the shared workbench column. The selected panel is remembered for the next open.
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+Source: [`packages/workbench/tool-workbench/src/index.ts`](../packages/workbench/tool-workbench/src/index.ts)
+
+### `workbench_open`
+
+Open the shared workbench column, optionally selecting a panel by id. The human sees the column open on the same panel; this call starts nothing else.
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "panel": {
+      "type": "string",
+      "description": "Panel id to select. Omit to keep the current selection."
+    }
+  }
+}
+```
+
+Source: [`packages/workbench/tool-workbench/src/index.ts`](../packages/workbench/tool-workbench/src/index.ts)
+
+### `workbench_status`
+
+Read the shared workbench view: whether the column is open and which panel is selected.
+
+```json
+{
+  "type": "object",
+  "properties": {}
+}
+```
+
+Source: [`packages/workbench/tool-workbench/src/index.ts`](../packages/workbench/tool-workbench/src/index.ts)
+
+The view is process-global rather than session-owned, so every call touches the built-in `global` resource and `workbench/changed` carries each committed view to the browser and the agent alike.
 
 <a id="deepseek-aidsh-tool-working-directory"></a>
 

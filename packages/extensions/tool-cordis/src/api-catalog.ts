@@ -698,6 +698,38 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         returns: 'the appended event seqs, summary, replaced range, and token accounting.',
         throws: ['when compaction is active or the range is missing, reversed, or unbalanced.'],
       },
+      {
+        signature: 'abstract prepareRegion( request: CompactionPreparationRequest, agent: CompactionAgentContext, signal: AbortSignal, onProgress: (progress: CompactionPreparationProgress) => Promise<void>, ): Promise<CompactionPreparation>',
+        description: 'Summarize one stable selected range without changing the Session surface. The caller records the request before invoking this method and durably records every progress item before review begins.',
+        parameters: [{ name: 'request', description: 'exact selected span, pricing, digest, and optional preservation brief.' }, { name: 'agent', description: 'Agent whose scoped provider and Session own the preparation.' }, { name: 'signal', description: 'cancellation forwarded to every provider call.' }, { name: 'onProgress', description: 'called for the capacity plan, each call attempt, and each successful completion.' }],
+        returns: 'deterministic chunks, every call result, and the final generated summary.',
+      },
+      {
+        signature: 'abstract commitPrepared( preparation: CompactionPreparation, summary: readonly ContentBlock[], source: \'generated\' | \'human\' | \'model\', admission: \'idle\' | \'current-turn\', agent: ManualCompactAgentContext, signal: AbortSignal, ): Promise<CompactionResult>',
+        description: 'Commit one reviewed preparation through short idle maintenance. Implementations revalidate exact selected membership, digest, balance, token price, and summary shrink before appending the standard bracket.',
+        parameters: [{ name: 'preparation', description: 'generated preparation and provider-call facts.' }, { name: 'summary', description: 'reviewed final summary blocks.' }, { name: 'source', description: 'whether generated output or a human/model edit is committed.' }, { name: 'admission', description: 'idle human maintenance or the caller\'s already-open model turn.' }, { name: 'agent', description: 'idle Agent whose Session is mutated.' }, { name: 'signal', description: 'cancellation for admission and persistence work.' }],
+        returns: 'the committed standard compaction result.',
+      },
+    ],
+  },
+  {
+    key: 'compactions',
+    summary: 'Global fallback plus per-Agent providers contributed by isolated presets.',
+    description: 'Global fallback plus per-Agent providers contributed by isolated presets.',
+    methods: [
+      {
+        signature: 'register(provider: CompactionEngine, agent?: CompactionAgentContext): () => void',
+        description: 'Register one provider for an isolated Agent or as the process fallback.',
+        parameters: [{ name: 'provider', description: 'compaction implementation contributed by one composition.' }, { name: 'agent', description: 'owning Agent when the provider lives in an Agent preset.' }],
+        returns: 'disposer removing only this exact registration.',
+      },
+      {
+        signature: 'resolve(agent: CompactionAgentContext): CompactionEngine',
+        description: 'Resolve the provider selected by one Agent\'s composition.',
+        parameters: [{ name: 'agent', description: 'target Agent.' }],
+        returns: 'the Agent provider, otherwise the global fallback.',
+        throws: ['when neither composition supplied a provider.'],
+      },
     ],
   },
   {
@@ -2050,6 +2082,82 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Update the name, instruction, and timing of an active task within the original Session binding without activating the Session or changing saved deliveries.\n\nEach supplied field replaces its stored value; an omitted field keeps it. A name or instruction change alone does not reset the committed target. A Session a delegated child owns returns the non-mutating `subagent_session` result, so an edit cannot re-arm a task bound to a Session delivery can never reach, and the Web editor can explain the refusal through the ordinary result it already renders.',
         parameters: [{ name: 'request', description: 'Task binding, complete observed record, and any combination of timing, name, and instruction.' }, { name: 'signal', description: 'Cancellation checked after domain readiness and FIFO waits, before persistence begins.' }],
         returns: 'The committed record, unchanged record for a no-op, or a non-mutating input/lookup/conflict/refusal result. Storage and lifecycle failures reject; cancellation after a write starts does not roll it back.',
+      },
+    ],
+  },
+  {
+    key: 'sessionContext',
+    summary: 'Current model-context inspection and rewrite service.',
+    description: 'Current model-context inspection and rewrite service.',
+    methods: [
+      {
+        signature: '@Remote(\'inspect\') async inspect( agent: Agent, request: ContextInspectRequest, signal: AbortSignal, ): Promise<ContextSnapshot>',
+        description: 'Return a bounded page from one immutable capture of the current durable model context.',
+        parameters: [{ name: 'agent', description: 'live Agent whose Session is inspected.' }, { name: 'request', description: 'tail-first unit page bounds, capped by service configuration.' }, { name: 'signal', description: 'cancellation for cooperative unit construction.' }],
+        returns: 'token totals, current units, and recent durable preparations from the same capture.',
+        throws: ['when cancelled, page bounds are invalid, or Session and token-meter captures disagree.'],
+      },
+      {
+        signature: '@Remote(\'readUnit\') readUnit(agent: Agent, unitId: ContextUnitId, signal: AbortSignal): ContextUnitDetail',
+        description: 'Return the complete model messages represented by one currently visible unit.',
+        parameters: [{ name: 'agent', description: 'live Agent whose current context owns the unit.' }, { name: 'unitId', description: 'stable identity from a current inspection result.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'the current unit metadata and its complete model messages.',
+        throws: ['when cancelled or when the unit is not part of the current context generation.'],
+      },
+      {
+        signature: '@Remote(\'rewrite\') rewrite(agent: Agent, request: ContextRewriteRequest, signal: AbortSignal): Promise<ContextRewriteResult>',
+        description: 'Append a replacement for one editable unit or its dependent suffix and flush the durable rewrite.',
+        parameters: [{ name: 'agent', description: 'live Agent whose current context is rewritten.' }, { name: 'request', description: 'replacement text, mode, and expected tail.' }, { name: 'signal', description: 'cancellation shared with idle maintenance admission.' }],
+        returns: 'durable rewrite identity, replacement seq, and shadowed counts.',
+        throws: ['when cancelled, the Agent is busy, or the selected unit, balance, editability, or tail has changed.'],
+      },
+      {
+        signature: '@Remote(\'prepare\') async prepare( agent: Agent, request: ContextPrepareRequest, signal: AbortSignal, ): Promise<ContextPreparation>',
+        description: 'Prepare a balanced current-unit range for durable review without changing model context. A provider failure is recorded and returned as a failed preparation; cancellation still rejects.',
+        parameters: [{ name: 'agent', description: 'live Agent whose current context supplies the selected range and compaction route.' }, { name: 'request', description: 'inclusive current-unit endpoints and optional preservation brief.' }, { name: 'signal', description: 'cancellation for generation and durable progress recording.' }],
+        returns: 'the ready or failed durable preparation after all progress is flushed.',
+        throws: ['when cancelled, another preparation is active, or the selected range is stale or unbalanced.'],
+      },
+      {
+        signature: '@Remote(\'editPreparation\') async editPreparation( agent: Agent, request: ContextPreparationEditRequest, signal: AbortSignal, ): Promise<ContextPreparation>',
+        description: 'Persist one reviewed summary edit while leaving current model context unchanged.',
+        parameters: [{ name: 'agent', description: 'live Agent whose Session owns the preparation.' }, { name: 'request', description: 'ready preparation, non-blank replacement text, and edit source.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'the updated durable preparation after the edit is flushed.',
+        throws: ['when cancelled, the preparation is missing or not ready, or the replacement text is blank.'],
+      },
+      {
+        signature: '@Remote(\'discardPreparation\') async discardPreparation( agent: Agent, request: ContextPreparationRef, signal: AbortSignal, ): Promise<{ discarded: true }>',
+        description: 'Discard one ready or failed preparation without changing current model context.',
+        parameters: [{ name: 'agent', description: 'live Agent whose Session owns the preparation.' }, { name: 'request', description: 'durable preparation identity.' }, { name: 'signal', description: 'request cancellation.' }],
+        returns: 'confirmation after the discard record is flushed.',
+        throws: ['when cancelled or when the preparation is missing or not ready or failed.'],
+      },
+      {
+        signature: '@Remote(\'commitPreparation\') commitPreparation( agent: Agent, request: ContextPreparationRef, signal: AbortSignal, ): Promise<CompactionResult>',
+        description: 'Commit one reviewed preparation after exact current-span revalidation.',
+        parameters: [{ name: 'agent', description: 'idle live Agent whose current context is replaced.' }, { name: 'request', description: 'ready durable preparation identity.' }, { name: 'signal', description: 'cancellation for compaction admission and commit.' }],
+        returns: 'the standard compaction result after the replacement is committed.',
+        throws: ['when cancelled, the Agent is busy, the preparation is not ready, or its selected span is stale.'],
+      },
+      {
+        signature: 'commitPreparationInTurn( agent: Agent, request: ContextPreparationRef, signal: AbortSignal, ): Promise<CompactionResult>',
+        description: 'Commit a preparation inside its caller\'s already-open model turn.',
+        parameters: [{ name: 'agent', description: 'current tool execution owner.' }, { name: 'request', description: 'durable preparation identity.' }, { name: 'signal', description: 'current tool cancellation.' }],
+        returns: 'the standard compaction result.',
+      },
+      {
+        signature: '@Remote(\'historyRead\') historyRead( agent: Agent, request: ContextHistoryReadRequest, signal: AbortSignal, ): Promise<ContextHistoryReadResult>',
+        description: 'Read one bounded page of exact checkpoint originals.',
+        parameters: [{ name: 'agent', description: 'live Agent whose append-only Session log contains the checkpoint.' }, { name: 'request', description: 'checkpoint, traversal mode, cursor, and requested response-byte bound.' }, { name: 'signal', description: 'cancellation for cooperative traversal.' }],
+        returns: 'original-message fragments plus an opaque continuation cursor when more remain.',
+        throws: ['when cancelled, bounds or cursor are invalid, the checkpoint is missing, or one entry cannot fit.'],
+      },
+      {
+        signature: '@Remote(\'historySearch\') historySearch( agent: Agent, request: ContextHistorySearchRequest, signal: AbortSignal, ): Promise<ContextHistorySearchResult>',
+        description: 'Search one checkpoint\'s reachable originals with bounded literal scanning.',
+        parameters: [{ name: 'agent', description: 'live Agent whose append-only Session log contains the checkpoint.' }, { name: 'request', description: 'checkpoint, literal query, traversal options, cursor, and result or scan bounds.' }, { name: 'signal', description: 'cancellation for cooperative scanning.' }],
+        returns: 'literal matches plus an opaque continuation cursor when the traversal is incomplete.',
+        throws: ['when cancelled, query or bounds are invalid, the cursor mismatches, or the checkpoint is missing.'],
       },
     ],
   },
@@ -3732,6 +3840,43 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'workbench',
+    summary: 'The shared workbench service: one mutable view, one commit path, one event.',
+    description: 'The shared workbench service: one mutable view, one commit path, one event. The view carries no session identity, so every Remote call touches the built-in `global` resource and the package registers no resource kind.',
+    methods: [
+      {
+        signature: '@Remote(\'state\') state(): WorkbenchView',
+        description: 'Read the current view.',
+        parameters: [],
+        returns: 'a detached copy of the committed view.',
+      },
+      {
+        signature: '@Remote(\'open\') open(panelId: string | null): WorkbenchView',
+        description: 'Open the workbench, optionally selecting a panel.',
+        parameters: [{ name: 'panelId', description: 'panel id to select, or null to keep the current selection.' }],
+        returns: 'the committed view.',
+      },
+      {
+        signature: '@Remote(\'close\') close(): WorkbenchView',
+        description: 'Close the workbench. The selection is kept, so reopening returns to it.',
+        parameters: [],
+        returns: 'the committed view.',
+      },
+      {
+        signature: '@Remote(\'select\') select(panelId: string): WorkbenchView',
+        description: 'Select a panel and open the workbench.',
+        parameters: [{ name: 'panelId', description: 'panel id to select.' }],
+        returns: 'the committed view.',
+      },
+      {
+        signature: '@Remote(\'toggle\') toggle(): WorkbenchView',
+        description: 'Toggle the workbench column: open with the current selection, or close.',
+        parameters: [],
+        returns: 'the committed view.',
+      },
+    ],
+  },
+  {
     key: 'workflowEngine',
     summary: 'Workflow Service Definition contract.',
     description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, and disposal waits for script and child cleanup. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
@@ -4590,6 +4735,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'table', description: 'Mutable row table; listeners append in activation order.' }],
   },
   {
+    name: 'workbench/changed',
+    mode: 'emit',
+    signature: '\'workbench/changed\'(view: WorkbenchView): void',
+    summary: 'The shared workbench view changed.',
+    description: 'The shared workbench view changed. Emitted on every commit — a browser gesture, an agent tool call, or a Remote call — so a client can apply the committed value instead of deriving its own.',
+    parameters: [{ name: 'view', description: 'the committed view state.' }],
+  },
+  {
     name: 'workflow/agent-end',
     mode: 'emit',
     signature: '\'workflow/agent-end\'(info: WorkflowRunInfo, agent: WorkflowAgentEndInfo): void',
@@ -5062,8 +5215,48 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface CompactionAgentContext {\n    session: Session;\n    options: {\n        provider?: string;\n        model?: string;\n    };\n}',
   },
   {
+    name: 'CompactionEngine',
+    declaration: 'export abstract class CompactionEngine extends Service {\n    constructor(ctx: Context);\n    abstract compactIfNeeded(agent: CompactionAgentContext, trigger: CompactionTrigger, signal: AbortSignal): Promise<CompactionResult | null>;\n    abstract compactNow(agent: ManualCompactAgentContext, signal: AbortSignal, sourceCommandId?: CommandId): Promise<CompactionResult | null>;\n    abstract compactRegion(start: SessionSeq, end: SessionSeq, agent: CompactionAgentContext, signal?: AbortSignal): Promise<CompactionResult>;\n    abstract prepareRegion(request: CompactionPreparationRequest, agent: CompactionAgentContext, signal: AbortSignal, onProgress: (progress: CompactionPreparationProgress) => Promise<void>): Promise<CompactionPreparation>;\n    abstract commitPrepared(preparation: CompactionPreparation, summary: readonly ContentBlock[], source: \'generated\' | \'human\' | \'model\', admission: \'idle\' | \'current-turn\', agent: ManualCompactAgentContext, signal: AbortSignal): Promise<CompactionResult>;\n}',
+  },
+  {
     name: 'CompactionId',
     declaration: 'export type CompactionId = Branded<\'CompactionId\'>;',
+  },
+  {
+    name: 'CompactionPreparation',
+    declaration: 'export interface CompactionPreparation {\n    request: CompactionPreparationRequest;\n    chunks: CompactionPreparationChunk[];\n    calls: CompactionPreparationCall[];\n    summary: ContentBlock[];\n}',
+  },
+  {
+    name: 'CompactionPreparationAttempt',
+    declaration: 'export interface CompactionPreparationAttempt {\n    index: number;\n    stage: CompactionPreparationStage;\n    chunkIndexes: number[];\n    inputTokens: number;\n    provider: string;\n    model: string;\n    maxTokens: number;\n}',
+  },
+  {
+    name: 'CompactionPreparationCall',
+    declaration: 'export type CompactionPreparationCall = {\n    index: number;\n    stage: CompactionPreparationStage;\n    chunkIndexes: number[];\n    summary: ContentBlock[];\n    provider: string;\n    model: string;\n    maxTokens?: number;\n    usage?: TokenUsage;\n} & ({\n    rawOutput: ContentBlock[];\n    llmStreamCall: true;\n} | {\n    rawOutput?: ContentBlock[];\n    llmStreamCall?: never;\n});',
+  },
+  {
+    name: 'CompactionPreparationChunk',
+    declaration: 'export interface CompactionPreparationChunk {\n    index: number;\n    stage: CompactionPreparationStage;\n    startSeq: SessionSeq;\n    endSeq: SessionSeq;\n    part: number;\n    parts: number;\n    estimatedTokens: number;\n    inputDigest: string;\n}',
+  },
+  {
+    name: 'CompactionPreparationId',
+    declaration: 'export type CompactionPreparationId = Branded<\'CompactionPreparationId\'>;',
+  },
+  {
+    name: 'CompactionPreparationPlan',
+    declaration: 'export interface CompactionPreparationPlan {\n    strategy: \'direct\' | \'map-reduce\';\n    provider: string;\n    model: string;\n    contextWindow: number;\n    modelMaxOutputTokens?: number;\n    desiredOutputTokens: number;\n    outputTokenCap: number;\n    directInputTokens: number;\n    inputTokenBudget: number;\n}',
+  },
+  {
+    name: 'CompactionPreparationProgress',
+    declaration: 'export type CompactionPreparationProgress = {\n    kind: \'planned\';\n    plan: CompactionPreparationPlan;\n    chunks: CompactionPreparationChunk[];\n} | {\n    kind: \'attempt\';\n    attempt: CompactionPreparationAttempt;\n} | {\n    kind: \'call\';\n    call: CompactionPreparationCall;\n};',
+  },
+  {
+    name: 'CompactionPreparationRequest',
+    declaration: 'export interface CompactionPreparationRequest {\n    preparationId: CompactionPreparationId;\n    start: SessionSeq;\n    end: SessionSeq;\n    shadowedSeqs: SessionSeq[];\n    shadowedDigest: string;\n    shadowedTokenCount: number;\n    unitCount: number;\n    preservationBrief?: string;\n}',
+  },
+  {
+    name: 'CompactionPreparationStage',
+    declaration: 'export type CompactionPreparationStage = \'direct\' | \'map\' | \'reduce\';',
   },
   {
     name: 'CompactionResult',
@@ -5160,6 +5353,102 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'ContentBlockType',
     declaration: 'export type ContentBlockType = keyof ContentBlockMap;',
+  },
+  {
+    name: 'ContextHistoryCursor',
+    declaration: 'export type ContextHistoryCursor = Branded<\'ContextHistoryCursor\'>;',
+  },
+  {
+    name: 'ContextHistoryEntry',
+    declaration: 'export interface ContextHistoryEntry {\n    readonly checkpointId: CompactionId;\n    readonly seq: SessionSeq;\n    readonly role: Message[\'role\'];\n    readonly offset: number;\n    readonly text: string;\n    readonly complete: boolean;\n    readonly nestedCheckpointId?: CompactionId;\n}',
+  },
+  {
+    name: 'ContextHistoryReadRequest',
+    declaration: 'export interface ContextHistoryReadRequest {\n    readonly checkpointId: CompactionId;\n    readonly recursive?: boolean;\n    readonly cursor?: ContextHistoryCursor;\n    readonly maxBytes?: number;\n}',
+  },
+  {
+    name: 'ContextHistoryReadResult',
+    declaration: 'export interface ContextHistoryReadResult {\n    readonly entries: readonly ContextHistoryEntry[];\n    readonly nextCursor?: ContextHistoryCursor;\n    readonly complete: boolean;\n    readonly returnedBytes: number;\n}',
+  },
+  {
+    name: 'ContextHistorySearchMatch',
+    declaration: 'export interface ContextHistorySearchMatch {\n    readonly checkpointId: CompactionId;\n    readonly seq: SessionSeq;\n    readonly offset: number;\n    readonly snippet: string;\n    readonly nestedCheckpointId?: CompactionId;\n}',
+  },
+  {
+    name: 'ContextHistorySearchRequest',
+    declaration: 'export interface ContextHistorySearchRequest {\n    readonly checkpointId: CompactionId;\n    readonly query: string;\n    readonly recursive?: boolean;\n    readonly caseSensitive?: boolean;\n    readonly cursor?: ContextHistoryCursor;\n    readonly maxResults?: number;\n    readonly maxScanBytes?: number;\n}',
+  },
+  {
+    name: 'ContextHistorySearchResult',
+    declaration: 'export interface ContextHistorySearchResult {\n    readonly matches: readonly ContextHistorySearchMatch[];\n    readonly nextCursor?: ContextHistoryCursor;\n    readonly complete: boolean;\n    readonly scannedBytes: number;\n}',
+  },
+  {
+    name: 'ContextInspectRequest',
+    declaration: 'export interface ContextInspectRequest {\n    readonly beforeIndex?: number;\n    readonly maxUnits?: number;\n}',
+  },
+  {
+    name: 'ContextPreparation',
+    declaration: 'export interface ContextPreparation {\n    readonly preparationId: CompactionPreparationId;\n    readonly status: ContextPreparationStatus;\n    readonly startSeq: SessionSeq;\n    readonly endSeq: SessionSeq;\n    readonly unitCount: number;\n    readonly shadowedTokenCount: number;\n    readonly preservationBrief?: string;\n    readonly summary: string;\n    readonly summarySource: \'generated\' | \'human\' | \'model\';\n    readonly plan?: CompactionPreparationPlan;\n    readonly attemptedCalls?: number;\n    readonly completedCalls: number;\n    readonly chunkCount: number;\n    readonly createdAt: number;\n    readonly error?: string;\n    readonly compactionId?: CompactionId;\n}',
+  },
+  {
+    name: 'ContextPreparationEditRequest',
+    declaration: 'export interface ContextPreparationEditRequest {\n    readonly preparationId: CompactionPreparationId;\n    readonly text: string;\n    readonly source: \'human\' | \'model\';\n}',
+  },
+  {
+    name: 'ContextPreparationRef',
+    declaration: 'export interface ContextPreparationRef {\n    readonly preparationId: CompactionPreparationId;\n}',
+  },
+  {
+    name: 'ContextPreparationStatus',
+    declaration: 'export type ContextPreparationStatus = \'preparing\' | \'ready\' | \'failed\' | \'discarded\' | \'committing\' | \'committed\';',
+  },
+  {
+    name: 'ContextPrepareRequest',
+    declaration: 'export interface ContextPrepareRequest {\n    readonly startUnitId: ContextUnitId;\n    readonly endUnitId: ContextUnitId;\n    readonly preservationBrief?: string;\n}',
+  },
+  {
+    name: 'ContextRewriteId',
+    declaration: 'export type ContextRewriteId = Branded<\'ContextRewriteId\'>;',
+  },
+  {
+    name: 'ContextRewriteMode',
+    declaration: 'export type ContextRewriteMode = \'edit-and-continue\' | \'patch\';',
+  },
+  {
+    name: 'ContextRewriteRequest',
+    declaration: 'export interface ContextRewriteRequest {\n    readonly unitId: ContextUnitId;\n    readonly expectedTailSeq: SessionSeq;\n    readonly mode: ContextRewriteMode;\n    readonly text: string;\n}',
+  },
+  {
+    name: 'ContextRewriteResult',
+    declaration: 'export interface ContextRewriteResult {\n    readonly rewriteId: ContextRewriteId;\n    readonly replacementSeq: SessionSeq;\n    readonly previousGenerationSeq: SessionSeq | null;\n    readonly shadowedItemCount: number;\n    readonly shadowedTokenCount: number;\n}',
+  },
+  {
+    name: 'ContextSnapshot',
+    declaration: 'export interface ContextSnapshot {\n    readonly sessionId: SessionId;\n    readonly logRevision: SessionLogOffset;\n    readonly replaceGeneration: number;\n    readonly generationSeq: SessionSeq | null;\n    readonly tailSeq: SessionSeq | null;\n    readonly totalTokens: number;\n    readonly surfaceTokens: number;\n    readonly route?: {\n        readonly provider: string;\n        readonly model: string;\n    };\n    readonly unitCount: number;\n    readonly unitOffset: number;\n    readonly hasEarlierUnits: boolean;\n    readonly units: readonly ContextUnit[];\n    readonly preparations: readonly ContextPreparation[];\n}',
+  },
+  {
+    name: 'ContextUnit',
+    declaration: 'export interface ContextUnit {\n    readonly id: ContextUnitId;\n    readonly startSeq: SessionSeq;\n    readonly endSeq: SessionSeq;\n    readonly kind: ContextUnitKind;\n    readonly role: ContextUnitRole;\n    readonly tokenCount: number;\n    readonly preview: string;\n    readonly time: number;\n    readonly balanced: boolean;\n    readonly editable: boolean;\n    readonly checkpointId?: CompactionId;\n}',
+  },
+  {
+    name: 'ContextUnitDetail',
+    declaration: 'export interface ContextUnitDetail {\n    readonly unit: ContextUnit;\n    readonly messages: readonly ContextUnitMessage[];\n}',
+  },
+  {
+    name: 'ContextUnitId',
+    declaration: 'export type ContextUnitId = Branded<\'ContextUnitId\'>;',
+  },
+  {
+    name: 'ContextUnitKind',
+    declaration: 'export type ContextUnitKind = \'message\' | \'tool-exchange\' | \'checkpoint\';',
+  },
+  {
+    name: 'ContextUnitMessage',
+    declaration: 'export interface ContextUnitMessage {\n    readonly role: \'user\' | \'assistant\';\n    readonly content: readonly ContentBlock[];\n}',
+  },
+  {
+    name: 'ContextUnitRole',
+    declaration: 'export type ContextUnitRole = \'user\' | \'assistant\' | \'context\';',
   },
   {
     name: 'ContinuableCreateRequest',
@@ -8680,6 +8969,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WeeklyScheduleRecord',
     declaration: 'export interface WeeklyScheduleRecord {\n    readonly id: ScheduleId;\n    readonly kind: \'weekly\';\n    readonly title: string;\n    readonly prompt: string;\n    readonly time: string;\n    readonly timeZone: string;\n    readonly weekdays: number[];\n    readonly scheduledAt: string;\n}',
+  },
+  {
+    name: 'WorkbenchView',
+    declaration: 'export interface WorkbenchView {\n    open: boolean;\n    active: string | null;\n}',
   },
   {
     name: 'WorkflowAgentEndInfo',

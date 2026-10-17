@@ -1,0 +1,19 @@
+# Bilingual-pair consistency record for session-context.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write docs/subsystems/session-context.md
+/session-context:
+  en: 1231df5bdefb44c0
+  zh: 4c4f26d2dbf413b3
+/session-context/current-units-and-snapshots:
+  en: 34de324b1a29069d
+  zh: f033468827800e41
+/session-context/reviewed-preparation:
+  en: 3a6f8ff99dac17fd
+  zh: fe21c7bb6862221d
+/session-context/same-session-rewrite:
+  en: 04d47c28abcce790
+  zh: 3607386c38b93a1d
+/session-context/checkpoint-recall:
+  en: dd94967106531d55
+  zh: bd7f9717b6475e3a

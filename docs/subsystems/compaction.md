@@ -203,11 +203,63 @@ abstract compactNow( agent: ManualCompactAgentContext, signal: AbortSignal, sour
  * @returns the appended event seqs, summary, replaced range, and token accounting.
  */
 abstract compactRegion( start: SessionSeq, end: SessionSeq, agent: CompactionAgentContext, signal?: AbortSignal, ): Promise<CompactionResult>
+
+/**
+ * Summarize one stable selected range without changing the Session surface.
+ * The caller records the request before invoking this method and durably
+ * records every progress item before review begins.
+ * @param request - exact selected span, pricing, digest, and optional preservation brief.
+ * @param agent - Agent whose scoped provider and Session own the preparation.
+ * @param signal - cancellation forwarded to every provider call.
+ * @param onProgress - called for the capacity plan, each call attempt, and each successful completion.
+ * @returns deterministic chunks, every call result, and the final generated summary.
+ */
+abstract prepareRegion( request: CompactionPreparationRequest, agent: CompactionAgentContext, signal: AbortSignal, onProgress: (progress: CompactionPreparationProgress) => Promise<void>, ): Promise<CompactionPreparation>
+
+/**
+ * Commit one reviewed preparation through short idle maintenance.
+ * Implementations revalidate exact selected membership, digest, balance,
+ * token price, and summary shrink before appending the standard bracket.
+ * @param preparation - generated preparation and provider-call facts.
+ * @param summary - reviewed final summary blocks.
+ * @param source - whether generated output or a human/model edit is committed.
+ * @param admission - idle human maintenance or the caller's already-open model turn.
+ * @param agent - idle Agent whose Session is mutated.
+ * @param signal - cancellation for admission and persistence work.
+ * @returns the committed standard compaction result.
+ */
+abstract commitPrepared( preparation: CompactionPreparation, summary: readonly ContentBlock[], source: 'generated' | 'human' | 'model', admission: 'idle' | 'current-turn', agent: ManualCompactAgentContext, signal: AbortSignal, ): Promise<CompactionResult>
 ```
 
-Types: [CommandId](commands.md) · [SessionSeq](session.md)
+Types: [CommandId](commands.md) · [ContentBlock](llm-streaming.md) · [SessionSeq](session.md)
 
 Source: [`packages/compaction/compaction/src/index.ts`](../../packages/compaction/compaction/src/index.ts)
+
+<a id="ctxcompactions--compactiondirectory"></a>
+
+### `ctx.compactions` — `CompactionDirectory`
+
+Global fallback plus per-Agent providers contributed by isolated presets.
+
+```ts cordis-catalog
+/**
+ * Register one provider for an isolated Agent or as the process fallback.
+ * @param provider - compaction implementation contributed by one composition.
+ * @param agent - owning Agent when the provider lives in an Agent preset.
+ * @returns disposer removing only this exact registration.
+ */
+register(provider: CompactionEngine, agent?: CompactionAgentContext): () => void
+
+/**
+ * Resolve the provider selected by one Agent's composition.
+ * @param agent - target Agent.
+ * @returns the Agent provider, otherwise the global fallback.
+ * @throws when neither composition supplied a provider.
+ */
+resolve(agent: CompactionAgentContext): CompactionEngine
+```
+
+Source: [`packages/compaction/compaction/src/directory.ts`](../../packages/compaction/compaction/src/directory.ts)
 
 <a id="ctxtoolresultpruner--toolresultpruner"></a>
 
