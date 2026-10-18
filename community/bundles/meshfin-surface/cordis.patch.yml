@@ -8,6 +8,12 @@
 # a statement of which class of client sent each turn's prompt, which matters
 # because one session is driven from a phone and a computer.
 - insert:
+    # Compaction provider resolution: a prepared commit runs against whichever
+    # engine this service resolves, so it has to be composed before the context
+    # service that commits through it.
+    - id: compactions
+      name: '@deepseek-ai/dsh-compaction/directory'
+
     # Context: the Host service, its model-facing tools, and the browser view
     # that renders them beside Chat.
     - id: session-context
