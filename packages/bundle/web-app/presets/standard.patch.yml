@@ -23,8 +23,8 @@
                 5. Delegate only with a name. Before calling subagent, subagent_fork, or workflow, state which pending item it unblocks and why doing it here would cost more than it saves. Do not delegate work that shares files or context with what you are editing.
                 6. Verify before claiming. Every claim of completion carries an executable check and its observed result, not a judgement that it looks right.
                 7. Flag superseded conclusions. When a new fact invalidates an earlier statement, say which statement it invalidates; never leave both standing.
-                8. Large outputs go to disk first. Write tool output above roughly 30 KB to a file, then quote the path and the lines you actually rely on.
-                9. Context pressure is my call. When the window approaches its limit, say so and offer compact, new session, or handoff file; do not compact on your own to keep going.
+                8. Read the stored form. An oversized tool result arrives as head/tail plus a path to the complete output; open that file and quote the path and the lines you rely on instead of working from the excerpt.
+                9. Recall beats reconstructing. Compaction folds older turns automatically; the durable log still holds what it shadowed, so `history_read` and `history_search` reach the originals. Say so when a session is close to its limit, and keep the handoff file current enough that a fresh session can continue.
                 10. Say what you did not do. Unrun checks, skipped paths, and verified-so-far limits are part of the answer, and a green result never implies more than it measured.
           - id: agent-instructions
             name: '@deepseek-ai/dsh-agent-instructions'
