@@ -9,7 +9,8 @@ import { ContextMeterAction } from '../src/client/ContextMeterAction.tsx'
 import { ContextPreparationPanel } from '../src/client/ContextPreparationPanel.tsx'
 import { ContextUnitDetail as UnitDetail } from '../src/client/ContextUnitDetail.tsx'
 import { ContextUnitRow } from '../src/client/ContextView.tsx'
-import { ContextRewriteNode } from '../src/client/context-rewrite-node.tsx'
+import { ContextRewriteMarker } from '../src/client/context-rewrite-node.tsx'
+import type { ContextRewriteMarkerProps } from '../src/client/context-rewrite-node.tsx'
 import { zh } from '../src/client/locales.ts'
 import type { ContextMeterActionProps } from '../src/client/ContextMeterAction.tsx'
 
@@ -331,7 +332,7 @@ describe('Session Context components', () => {
 
   it('renders the durable rewrite marker and opens Context', () => {
     const openContext = vi.fn()
-    const props = {
+    const props: ContextRewriteMarkerProps = {
       node: {
         key: 'rewrite',
         kind: 'context-rewrite',
@@ -344,8 +345,8 @@ describe('Session Context components', () => {
       },
       openContext,
       t,
-    } as unknown as Parameters<typeof ContextRewriteNode>[0]
-    render(<ContextRewriteNode {...props} />)
+    }
+    render(<ContextRewriteMarker {...props} />)
     expect(screen.getByText(/已移出后续 3 个上下文项/)).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '查看当前上下文' }))
     expect(openContext).toHaveBeenCalledOnce()

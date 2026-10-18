@@ -1,10 +1,12 @@
 # dsh bundle patch: the Host rows that carry this distribution's own surface.
 #
 # Each row is a shipped package of this repository, so a profile that selects
-# this bundle gains exactly three capabilities the official composition does
+# this bundle gains exactly four capabilities the official composition does
 # not have: a context view that inspects, rewrites and reviews what the next
 # request is built from; a workbench view the browser and the agent both
-# mutate, with Range/206/416 byte serving; and the model-facing tools for both.
+# mutate, with Range/206/416 byte serving; the model-facing tools for both; and
+# a statement of which class of client sent each turn's prompt, which matters
+# because one session is driven from a phone and a computer.
 - insert:
     # Context: the Host service, its model-facing tools, and the browser view
     # that renders them beside Chat.
@@ -25,3 +27,8 @@
       name: '@deepseek-ai/dsh-tool-workbench'
     - id: ui-workbench
       name: '@deepseek-ai/dsh-client-ui-workbench'
+
+    # Client origin: tells the model which class of client sent the open turn's
+    # prompt, read back from the durable user message rather than the transport.
+    - id: client-origin
+      name: '@deepseek-ai/dsh-client-origin'

@@ -62,7 +62,7 @@ function setup() {
     historySearch: vi.fn(),
   } as never)
   plugin.apply(ctx, { maxUnits: 2 })
-  const agent = { id: 'tool-session' } as unknown as Agent
+  const agent = { id: 'tool-session' } as Agent
   const call = (name: string, args: unknown) => ctx.tools.execute({
     signal: new AbortController().signal,
     callId: ToolCallId(`call-${name}`),

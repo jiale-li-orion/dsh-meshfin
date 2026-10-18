@@ -1,0 +1,67 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/context/client-origin/README.md
+/:
+  en: 2277fb26b0e77b1d
+  zh: 8e44d72303c888cb
+/deepseek-ai-dsh-client-origin:
+  en: 3aecf9205c3a52b7
+  zh: e46ef67897fb3b57
+/deepseek-ai-dsh-client-origin/summary:
+  en: 627c8b242848dd43
+  zh: 8cc3976bb129099f
+/deepseek-ai-dsh-client-origin/table-of-contents:
+  en: d152484eb41ac6b4
+  zh: 09388d293f9be9cb
+/deepseek-ai-dsh-client-origin/use-this-package:
+  en: f044309be3f11a65
+  zh: 88e66f80a60f7b4d
+/deepseek-ai-dsh-client-origin/use-this-package/what-the-model-gets:
+  en: 9795ce64d0cbcdf3
+  zh: 21d423ae78eef9d3
+/deepseek-ai-dsh-client-origin/use-this-package/where-the-class-comes-from:
+  en: 5a9625c710760717
+  zh: bccc463dd996174a
+/deepseek-ai-dsh-client-origin/understand-the-implementation:
+  en: 2d21fa2aad5a729d
+  zh: d4eaa017910e4935
+/deepseek-ai-dsh-client-origin/understand-the-implementation/design-concept:
+  en: a29da194c32b54f7
+  zh: 7ea59f11f8bd571b
+/deepseek-ai-dsh-client-origin/understand-the-implementation/source-map:
+  en: 272f523f33b68c3a
+  zh: 69e7e7f8ce4b0074
+/deepseek-ai-dsh-client-origin/understand-the-implementation/main-flow:
+  en: 4baf3d5c17884e03
+  zh: 75c0651ebca5e234
+/deepseek-ai-dsh-client-origin/further-exploration:
+  en: 46f6d628e052ce06
+  zh: f8951eb42c59bb5a
+/deepseek-ai-dsh-client-origin/model-experience:
+  en: 215e7ba838619b7b
+  zh: a311da3843709f90
+/deepseek-ai-dsh-client-origin/model-experience/turn-start-client-origin-statement:
+  en: be4ac9de33914100
+  zh: b33dd9a8103ecb68
+/deepseek-ai-dsh-client-origin/model-experience/turn-start-client-origin-statement/what-the-model-sees:
+  en: 13ea2d0a0182c259
+  zh: 2162e176fd766bff
+/deepseek-ai-dsh-client-origin/model-experience/turn-start-client-origin-statement/what-the-model-sees/one-declared-class:
+  en: 968f1b4a070b5ace
+  zh: b5a3c7f9f2c8a81a
+/deepseek-ai-dsh-client-origin/model-experience/turn-start-client-origin-statement/what-the-model-sees/disagreeing-declarations:
+  en: 7aab4fee58e41c4a
+  zh: e378e4573df8e29f
+/deepseek-ai-dsh-client-origin/model-experience/turn-start-client-origin-statement/token-effect:
+  en: 471827cfe383e318
+  zh: 634f844f0d4bbfa1
+/deepseek-ai-dsh-client-origin/model-experience/turn-start-client-origin-statement/kv-cache-effect:
+  en: 90b4eee9e3beb775
+  zh: ba956d7450c6bf31
+/deepseek-ai-dsh-client-origin/known-limitations-and-deferred-work:
+  en: bd2c1c79de78c3f4
+  zh: fc1fdb2917c53c1c
+/deepseek-ai-dsh-client-origin/known-limitations-and-deferred-work/dev-note:
+  en: e67f633dc6fe7773
+  zh: 8ec3e73528ddb1a6

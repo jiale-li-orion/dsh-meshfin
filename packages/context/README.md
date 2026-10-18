@@ -29,6 +29,7 @@ The context group provides plugins that add model-visible context to each reques
 | [`file-reference/`](file-reference/README.md) | `@file` mention discovery and the shared mention grammar for host-backed UIs | `ctx.fileReferences` |
 | [`file-reference-local/`](file-reference-local/README.md) | Local-workspace completion provider for `@file` mentions | — |
 | [`time-context/`](time-context/README.md) | Current time, browser zone, and elapsed time per step | — |
+| [`client-origin/`](client-origin/README.md) | Which class of client sent the open turn's prompt | — |
 | [`tmux-context/`](tmux-context/README.md) | The agent's tmux session, window, and pane location | — |
 | [`harness-dev-context/`](harness-dev-context/README.md) | The harness checkout and Web GUI URL as runtime context, keeping the system prompt stable across processes | — |
 

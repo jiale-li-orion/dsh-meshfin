@@ -6,7 +6,7 @@ import type {
 } from '@deepseek-ai/dsh-attachment'
 import type { Branded } from '@deepseek-ai/dsh-brand'
 import type { LlmAttemptId, MessageId } from '@deepseek-ai/dsh-llm/brand'
-import type { TextBlock } from '@deepseek-ai/dsh-llm'
+import type { ClientDevice, TextBlock } from '@deepseek-ai/dsh-llm'
 import type { SessionId, SessionSeqCursor } from '@deepseek-ai/dsh-session/types'
 import type { SessionProjectionMap } from '@deepseek-ai/dsh-session-projection/types'
 import type { Principal } from '@deepseek-ai/dsh-typert-protocol'
@@ -216,6 +216,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'session/writer-held': { readonly sessionId: SessionId }
     'session/agent-busy': { readonly reason: string }
     'session/invalid-time-zone': { readonly value: string }
+    'session/invalid-client-device': { readonly value: string }
     'session/workspace-attach-failed': { readonly sessionId: SessionId; readonly workspaceId: string }
     'agent-preset/conflict': {
       readonly sessionId: SessionId
@@ -349,6 +350,12 @@ export interface SessionPromptRequest {
   /** At least one non-whitespace text part or attachment. */
   readonly content: readonly PromptContentPart[]
   readonly clientTimeZone?: string
+  /**
+   * Which class of client is prompting. The Host validates it against the closed
+   * set and records it on the user message; omission stays valid for callers
+   * that cannot know, and is never guessed into a value.
+   */
+  readonly clientDevice?: ClientDevice
 }
 
 /** Receipt after one prompt enters the target Agent inbox. */
@@ -411,11 +418,18 @@ export type SessionRequestId = Branded<'session-request-id'>
 declare module '@deepseek-ai/dsh-llm' {
   interface MessageSourceMap {
     /**
-     * Browser prompt correlation, optional Host-validated time zone, and the
-     * caller that submitted the prompt. `principal` is written only for a
-     * caller other than the owner, so an absent `principal` means the owner.
+     * Browser prompt correlation, the optional Host-validated time zone, the
+     * optional Host-validated client class, and the caller that submitted the
+     * prompt. `principal` is written only for a caller other than the owner, so
+     * an absent `principal` means the owner.
      */
-    'user-rpc': { kind: 'user'; rpcId: SessionRequestId; clientTimeZone?: string; principal?: Principal }
+    'user-rpc': {
+      kind: 'user'
+      rpcId: SessionRequestId
+      clientTimeZone?: string
+      clientDevice?: ClientDevice
+      principal?: Principal
+    }
   }
 }
 

@@ -101,6 +101,22 @@ export type ContextFormed =
   | { readonly form: 'recall' }
 
 /**
+ * Which class of client sent one prompt.
+ *
+ * Three coarse buckets: a model told that a message came from a phone app can
+ * answer for that screen, and nothing finer follows from the transport. No
+ * device name, model, or address belongs here — a wrong specific is worse than
+ * a coarse truth.
+ */
+export type ClientDevice = 'mobile-app' | 'mobile-browser' | 'desktop-browser'
+
+/**
+ * Every client class a caller may declare, for validators that need the set as
+ * a value rather than as a type.
+ */
+export const CLIENT_DEVICES: readonly ClientDevice[] = ['mobile-app', 'mobile-browser', 'desktop-browser']
+
+/**
  * Where a message (or injected content) came from, in the harness's own
  * vocabulary. Merge-extensible sum type — each producer declares its own
  * `kind` in its own module; there is no shared catch-all `plugin` kind.

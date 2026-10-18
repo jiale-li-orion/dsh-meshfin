@@ -798,6 +798,66 @@ describe('subagent ownership fence', () => {
     }
     expect(followup).toHaveBeenCalledTimes(3)
   })
+
+  it('records the declared client class on the exact prompt and rejects values outside the closed set', async () => {
+    const ctx = new Context()
+    await ctx.plugin(SessionStore)
+    await ctx.plugin(AgentRegistry)
+    const session = ctx.sessions.create(sid('session-client-device'), { meta: { cwd: '/proj' } })
+    const followup = vi.fn()
+    const agent = {
+      id: session.id, session, inbox: inboxFor(), status: 'idle', ctx, followup,
+    } as unknown as Agent
+    await ctx.agents.register(agent)
+    const remote = createSessionTestRemote(ctx, {
+      defaultModelSelection: () => ({ provider: 'p', model: 'm' }),
+      cwd: '/tmp',
+    })
+
+    for (const [index, clientDevice] of (['mobile-app', 'mobile-browser', 'desktop-browser'] as const).entries()) {
+      const request = promptRequest({
+        sessionId: agent.id,
+        mode: 'queue' as const,
+        content: [{ type: 'text' as const, text: `from ${clientDevice}` }],
+        clientDevice,
+      })
+      await expect(remote.prompt(request)).resolves.toMatchObject({ ok: true })
+      // The class rides the exact durable user message, so a later reader can
+      // tell which client sent each prompt without trusting the transport.
+      expect(followup).toHaveBeenNthCalledWith(index + 1, expect.objectContaining({
+        source: { kind: 'user', rpcId: request.requestId, clientDevice },
+      }))
+    }
+
+    const unclassified = promptRequest({
+      sessionId: agent.id,
+      mode: 'queue' as const,
+      content: [{ type: 'text' as const, text: 'unclassified work' }],
+    })
+    await expect(remote.prompt(unclassified)).resolves.toMatchObject({ ok: true })
+    // Omission stays valid and records no class: nothing guesses a device.
+    expect(followup).toHaveBeenNthCalledWith(4, expect.objectContaining({
+      source: { kind: 'user', rpcId: unclassified.requestId },
+    }))
+
+    for (const clientDevice of ['tablet', 'MOBILE-APP', '']) {
+      const invalid = await remote.prompt(promptRequest({
+        sessionId: agent.id,
+        mode: 'queue' as const,
+        content: [{ type: 'text' as const, text: 'invalid device' }],
+        clientDevice: clientDevice as never,
+      }))
+      expect(invalid).toMatchObject({
+        ok: false,
+        error: {
+          code: 'session/invalid-client-device',
+          message: 'clientDevice must be one of mobile-app, mobile-browser, desktop-browser',
+          details: { value: clientDevice },
+        },
+      })
+    }
+    expect(followup).toHaveBeenCalledTimes(4)
+  })
 })
 
 describe('degenerate composition (no persistence, no factory)', () => {

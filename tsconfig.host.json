@@ -385,6 +385,7 @@
     { "path": "./packages/schedule/schedule" },
     { "path": "./packages/schedule/tool-schedule" },
     { "path": "./packages/context/time-context" },
+    { "path": "./packages/context/client-origin" },
     { "path": "./packages/context/file-reference" },
     { "path": "./packages/context/file-reference-local" },
     { "path": "./packages/context/tmux-context" },

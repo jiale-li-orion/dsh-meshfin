@@ -69,17 +69,21 @@ interface ContextRewriteInjected {
   openContext: () => void
 }
 
-type ContextRewriteNodeProps =
+/** Props of the durable rewrite marker row; exported so a test can build one without a cast. */
+export type ContextRewriteNodeProps =
   PropsRuntime<'conversation.chat.node', 'context-rewrite'>
   & InjectFace<ContextRewriteInjected>
   & PropsLocale<'sessionContext'>
 
+/** The three inputs the marker actually reads; the rest of the slot contract is unused here. */
+export type ContextRewriteMarkerProps = Pick<ContextRewriteNodeProps, 'node' | 'openContext' | 't'>
+
 /**
- * Render a durable rewrite marker without removing any Chat rows.
+ * Render the durable rewrite marker from just the payload, the view selection, and copy.
  * @param props - marker payload, the injected view selection, and copy.
  * @returns the marker row.
  */
-export function ContextRewriteNode({ node, openContext, t }: ContextRewriteNodeProps) {
+export function ContextRewriteMarker({ node, openContext, t }: ContextRewriteMarkerProps) {
   const data = node.data
   return (
     <div className={css.root}>
@@ -104,6 +108,15 @@ export function ContextRewriteNode({ node, openContext, t }: ContextRewriteNodeP
  * @param ctx - client root context carrying the Conversation and slot registries.
  * @param openContext - select the Context view for one Session.
  */
+/**
+ * Slot-shaped entry: the chat node contract, narrowed to the marker's three inputs.
+ * @param props - the full chat node props the slot passes.
+ * @returns the marker row.
+ */
+export function ContextRewriteNode(props: ContextRewriteNodeProps) {
+  return <ContextRewriteMarker node={props.node} openContext={props.openContext} t={props.t} />
+}
+
 export function registerContextRewriteNode(ctx: Context, openContext: (sessionId: SessionId) => void): void {
   ctx.uiConversation.events.register(contextRewriteDefinition)
   ctx.slots.inject('conversation.chat.node', () => ctx.slots.register({

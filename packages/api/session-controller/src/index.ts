@@ -6,7 +6,7 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-fs'
 import { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { errorChain, ReasoningEffortId, type MessageSource } from '@deepseek-ai/dsh-llm'
+import { CLIENT_DEVICES, errorChain, ReasoningEffortId, type MessageSource } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-client-file-upload'
 import { canOpenNativePath, nativeFileManager, nativeFileApplications, openNativeFileApplication, openNativeAssociatedPath, revealNativePath } from '@deepseek-ai/dsh-native-command'
 import type { SessionId } from '@deepseek-ai/dsh-session'
@@ -474,12 +474,22 @@ export class SessionController extends TypertRemoteService {
         { value: request.clientTimeZone },
       )
     }
+    // A value outside the closed set is a caller bug, not a client class: refuse it
+    // rather than record a fourth bucket nothing consumes.
+    if (request.clientDevice !== undefined && !CLIENT_DEVICES.includes(request.clientDevice)) {
+      throw new RemoteError(
+        'session/invalid-client-device',
+        `clientDevice must be one of ${CLIENT_DEVICES.join(', ')}`,
+        { value: request.clientDevice },
+      )
+    }
     // The caller is recorded only when it is not the owner, so owner messages keep their exact source.
     const principal = principalOf(this.ctx.invocation)
     const source: MessageSource = {
       kind: 'user',
       rpcId: request.requestId,
       ...(clientTimeZone === undefined ? {} : { clientTimeZone }),
+      ...(request.clientDevice === undefined ? {} : { clientDevice: request.clientDevice }),
       ...(principal === undefined ? {} : { principal }),
     }
     return this.commands.prompt(request, source)
