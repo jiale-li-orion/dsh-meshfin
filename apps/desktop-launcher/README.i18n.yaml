@@ -1,0 +1,22 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write apps/desktop-launcher/README.md
+/meshfin-launch-block:
+  en: 0201881cfaf0b533
+  zh: 5790a729439c9417
+/meshfin-launch-block/the-url-a-launcher-opens:
+  en: c5652242a260a79c
+  zh: 23b3d5a94a03338e
+/meshfin-launch-block/windows:
+  en: 87e0c01c648bbc10
+  zh: 8b2eb404e9e9546f
+/meshfin-launch-block/windows/lifetime:
+  en: 9fe5796d8568196d
+  zh: d56dbeac5fad3d1f
+/meshfin-launch-block/wsl-and-linux:
+  en: 984c3d46ae6a3001
+  zh: 1ad6d6ee89790d92
+/meshfin-launch-block/the-desktop-tile:
+  en: a78bd342572a52ff
+  zh: a5286d38e2f47776

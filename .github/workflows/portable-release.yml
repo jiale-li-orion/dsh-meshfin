@@ -1,0 +1,343 @@
+# Portable distributions: one tag turns a commit into the two downloads this
+# distribution actually ships — the WSL/Linux archive and the Windows archive —
+# and replaces them in place on the rolling releases, so
+# `/releases/download/pc-wsl/...` keeps working across versions.
+#
+# Both archives carry the Web GUI. Neither carries an Electron or desktop
+# application: `apps/desktop/` and `apps/desktop-host/` are upstream packages
+# this distribution does not package, so no step here builds, packs, or copies
+# them. What the archives add over the npm packages is a Node runtime, the
+# community modules already installed, the launch block, and a launcher.
+#
+# The archives are built the way a maintainer builds them locally, through the
+# repository's own release output: `build:official` produces the client
+# artifacts and the build record `release:pack` requires, `release:pack` produces
+# the tarballs the npm release publishes, and `portable.ts` assembles them.
+name: Portable distributions
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PRIMARY_NODE_VERSION: '24'
+  # The Windows archive carries its own runtime, so this is the Node release its
+  # node.exe comes from. It must satisfy the root manifest's engines range.
+  WINDOWS_NODE_VERSION: '22.19.0'
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  portable:
+    name: portable archives (WSL/Linux and Windows)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      # One commit is enough: no release script here reads tags.
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      # No version input: the action reads `packageManager` from package.json,
+      # so the packing pnpm is the one the repository pins.
+      - uses: pnpm/action-setup@v5.0.0
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+          package-manager-cache: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `build:official` refuses to record a client build without both values,
+      # and `release:pack` later compares the recorded set against the set these
+      # produce (scripts/client-build-environment.ts:141). They must agree
+      # exactly, so both come from the same commit and manifest here.
+      - name: Resolve the official client build values
+        run: |
+          set -euo pipefail
+          echo "DSH_CLIENT_COMMIT_HASH=$(git rev-parse HEAD | cut -c1-7)" >> "$GITHUB_ENV"
+          echo "DSH_CLIENT_VERSION=$(node -p "require('./package.json').version")" >> "$GITHUB_ENV"
+
+      # One entry for the whole tree: native addon, every library face, the client
+      # bundles, the Web frontend, and the client build record. Also type-checks
+      # the aggregate test and script programs, so the scripts this workflow runs
+      # are compiled before they run.
+      - name: Build
+        run: pnpm run build:official
+
+      - name: Pack the release families
+        run: |
+          set -euo pipefail
+          pnpm run release:pack -- --family vendor --out dist/npm-vendor
+          pnpm run release:pack -- --family dsh --out dist/npm-dsh
+
+      # `@deepseek-ai/node-addon-system` publishes on its own release line, so
+      # neither family above carries it. Its per-platform payloads are workspace
+      # directories, which `portable.ts` copies by platform; its JavaScript entry
+      # is a package this repository's own packer produces, and its `prepack`
+      # gate refuses a tarball built without `lib/`.
+      - name: Pack the native addon entry
+        run: |
+          set -euo pipefail
+          mkdir -p dist/npm-native
+          pnpm --dir native/system/packages/entry pack --pack-destination "$PWD/dist/npm-native"
+
+      - name: Fetch the Windows Node runtime
+        run: |
+          set -euo pipefail
+          mkdir -p .artifacts/win-node
+          curl -sSL -o .artifacts/win-node/node-win.zip \
+            "https://nodejs.org/dist/v${WINDOWS_NODE_VERSION}/node-v${WINDOWS_NODE_VERSION}-win-x64.zip"
+          python3 - <<'PY'
+          import pathlib, zipfile
+          archive = zipfile.ZipFile('.artifacts/win-node/node-win.zip')
+          member = next(name for name in archive.namelist() if name.endswith('/node.exe'))
+          pathlib.Path('.artifacts/win-node/node.exe').write_bytes(archive.read(member))
+          PY
+
+      # `--dry-run` resolves every input — tarball manifests, the launch block,
+      # the native payload selection, the runtime — and writes nothing, so a
+      # broken input fails here instead of after a multi-minute npm install.
+      - name: Plan both distributions
+        run: |
+          set -euo pipefail
+          pnpm exec tsx scripts/release/portable.ts \
+            --tarballs dist/npm-vendor --tarballs dist/npm-dsh --tarballs dist/npm-native \
+            --out dist/meshfin-linux-x64 --runtime "$(command -v node)" --platform posix --dry-run
+          pnpm exec tsx scripts/release/portable.ts \
+            --tarballs dist/npm-vendor --tarballs dist/npm-dsh --tarballs dist/npm-native \
+            --out dist/meshfin-windows-x64 --runtime .artifacts/win-node/node.exe --platform windows --dry-run
+
+      - name: Assemble the WSL/Linux distribution
+        run: |
+          set -euo pipefail
+          pnpm exec tsx scripts/release/portable.ts \
+            --tarballs dist/npm-vendor --tarballs dist/npm-dsh --tarballs dist/npm-native \
+            --out dist/meshfin-linux-x64 --runtime "$(command -v node)" --platform posix
+
+      - name: Assemble the Windows distribution
+        run: |
+          set -euo pipefail
+          pnpm exec tsx scripts/release/portable.ts \
+            --tarballs dist/npm-vendor --tarballs dist/npm-dsh --tarballs dist/npm-native \
+            --out dist/meshfin-windows-x64 --runtime .artifacts/win-node/node.exe --platform windows
+
+      # The Web GUI authenticates each browser process, and the token travels in
+      # the URL query (`authenticatedUrl`), not on the origin: a bare `GET /`
+      # receives a 401 by design. The smoke therefore reads the `dsh web: <url>`
+      # line the process prints and fetches exactly that URL.
+      - name: Smoke-test the WSL/Linux distribution
+        run: |
+          set -euo pipefail
+          log="$RUNNER_TEMP/linux-smoke.log"
+          : > "$log"
+          env -u DSH_HOME ./dist/meshfin-linux-x64/meshfin web --no-open --port 3299 > "$log" 2>&1 &
+          server=$!
+          trap 'kill "$server" 2>/dev/null || true' EXIT
+          url=''
+          for _ in $(seq 1 120); do
+            url="$(grep -m1 -o 'dsh web: http[^[:space:]]*' "$log" | sed 's/^dsh web: //' || true)"
+            [ -n "$url" ] && break
+            kill -0 "$server" 2>/dev/null || break
+            sleep 1
+          done
+          if [ -z "$url" ]; then
+            echo "the portable distribution never printed its Web URL" >&2
+            cat "$log" >&2
+            exit 1
+          fi
+          echo "serving $url"
+          curl -fsS -L -c "$RUNNER_TEMP/smoke-jar" -b "$RUNNER_TEMP/smoke-jar" -o "$RUNNER_TEMP/index.html" "$url"
+          test -s "$RUNNER_TEMP/index.html"
+          echo "portable distribution served its Web UI"
+
+      - name: Archive
+        run: |
+          set -euo pipefail
+          tar czf dist/meshfin-linux-x64.tar.gz -C dist meshfin-linux-x64
+          (cd dist && zip -qr meshfin-windows-x64.zip meshfin-windows-x64)
+
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: portable-archives
+          path: |
+            dist/meshfin-linux-x64.tar.gz
+            dist/meshfin-windows-x64.zip
+          retention-days: 7
+
+  # The Windows archive is assembled on Linux, which cannot execute it. This job
+  # is what makes "the Windows build works" a fact instead of an expectation: it
+  # expands the same archive a reader downloads and serves its Web UI on Windows.
+  windows-smoke:
+    name: Windows archive on Windows
+    needs: portable
+    runs-on: windows-2025
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: portable-archives
+          path: artifacts
+
+      - name: Expand the archive
+        shell: pwsh
+        run: Expand-Archive -Path artifacts/meshfin-windows-x64.zip -DestinationPath expanded -Force
+
+      - name: Run the harness
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = & .\expanded\meshfin-windows-x64\meshfin.ps1 --version
+          Write-Host "reported version: $version"
+          if ($version -notmatch '^\d+\.\d+') { throw "unexpected --version output: $version" }
+
+      # Same rule as the Linux smoke: the token is in the URL query, so the
+      # origin alone answers 401 and the printed line is the URL to fetch.
+      - name: Serve the Web UI
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $PWD 'expanded/meshfin-windows-x64'
+          $log = Join-Path $env:RUNNER_TEMP 'windows-smoke.log'
+          $server = Start-Process -FilePath powershell -PassThru -NoNewWindow `
+            -RedirectStandardOutput $log -RedirectStandardError "$log.err" `
+            -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $root 'meshfin.ps1'),
+              'web', '--no-open', '--port', '3399')
+          try {
+            $url = $null
+            for ($attempt = 0; $attempt -lt 120; $attempt++) {
+              Start-Sleep -Seconds 1
+              if (Test-Path $log) {
+                $match = [regex]::Match((Get-Content -Raw -Path $log), 'dsh web: (http\S+)')
+                if ($match.Success) { $url = $match.Groups[1].Value; break }
+              }
+              if ($server.HasExited) { break }
+            }
+            if (-not $url) {
+              Write-Host (Get-Content -Raw -Path $log -ErrorAction SilentlyContinue)
+              Write-Host (Get-Content -Raw -Path "$log.err" -ErrorAction SilentlyContinue)
+              throw 'the Windows distribution never printed its Web URL'
+            }
+            Write-Host "serving $url"
+            $response = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 10
+            if ($response.StatusCode -ne 200 -or $response.Content.Length -eq 0) {
+              throw "unexpected response: $($response.StatusCode), $($response.Content.Length) bytes"
+            }
+            Write-Host "served $($response.Content.Length) bytes"
+          } finally {
+            Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue
+          }
+
+  # The Android shell is a phone client for the host's Web GUI, not a desktop
+  # application, so it stays in scope — but its toolchain is independent of the
+  # two archives, and a broken SDK must not block a release of them.
+  android:
+    name: Android shell
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.1.0'
+
+      - name: Accept Android SDK licenses
+        run: yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Build the debug APK
+        run: gradle -p apps/android-shell assembleDebug
+
+      - name: Read the built label back
+        run: |
+          # aapt2 lives in the SDK's build-tools, not on PATH; the label is what
+          # the phone shows after installing, so the build is not trusted blind.
+          aapt2="$(find "${ANDROID_HOME}/build-tools" -name aapt2 -type f | sort | tail -1)"
+          test -n "$aapt2"
+          "$aapt2" dump badging apps/android-shell/app/build/outputs/apk/debug/app-debug.apk \
+            | grep -E 'application-label|package: name'
+
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: android-shell
+          path: apps/android-shell/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7
+
+  publish:
+    name: publish the two archives
+    needs: [portable, windows-smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: portable-archives
+          path: artifacts
+
+      - name: Replace the rolling release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          linux="artifacts/meshfin-linux-x64.tar.gz"
+          windows="artifacts/meshfin-windows-x64.zip"
+          # `gh release upload` replaces an asset in place, so the download URLs
+          # documented in the README survive every release.
+          publish() {
+            tag="$1"; file="$2"; title="$3"
+            if gh release view "$tag" > /dev/null 2>&1; then
+              gh release upload "$tag" "$file" --clobber
+            else
+              gh release create "$tag" "$file" --title "$title" \
+                --notes "Built from $GITHUB_SHA by the Portable distributions workflow."
+            fi
+          }
+          publish pc-wsl "$linux" "Meshfin for WSL / Linux x64 — portable"
+          publish pc-windows "$windows" "Meshfin for Windows x64 — portable"
+
+  publish-android:
+    name: publish the Android shell
+    needs: android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: android-shell
+          path: artifacts
+
+      - name: Replace the rolling release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Published under its stable name, not the name the build gave it.
+          cp artifacts/app-debug.apk dsh-shell.apk
+          tag=android-shell
+          if gh release view "$tag" > /dev/null 2>&1; then
+            gh release upload "$tag" dsh-shell.apk --clobber
+          else
+            gh release create "$tag" dsh-shell.apk \
+              --title "DSH-Meshfin Android shell — rolling build" \
+              --notes "Built from $GITHUB_SHA by the Portable distributions workflow."
+          fi
