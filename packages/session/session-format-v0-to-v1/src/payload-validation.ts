@@ -20,6 +20,19 @@ export function assertReleasedPayloadSemantics(event: SessionFormatEvent, versio
     case 'agent-preset/selected':
       stringValue(data['agentPreset'], `${label} agentPreset`)
       return
+    case 'agent/context-run/requested':
+      nonEmptyString(data['contextRunId'], `${label} contextRunId`)
+      earlierSeq(data['generationSeq'], event.seq, `${label} generationSeq`)
+      literalValue(exactRecord(data['source'], `${label} source`, ['kind'])['kind'], ['context-rewrite'], `${label} source kind`)
+      return
+    case 'agent/context-run/claimed':
+      nonEmptyString(data['contextRunId'], `${label} contextRunId`)
+      countValue(data['turn'], `${label} turn`)
+      return
+    case 'agent/context-run/cancelled':
+      nonEmptyString(data['contextRunId'], `${label} contextRunId`)
+      literalValue(data['reason'], ['cancelled', 'stale-generation'], `${label} reason`)
+      return
     case 'agent/inbox/spliced':
       literalValue(data['target'], ['next-turn', 'next-step'], `${label} target`)
       countValue(data['start'], `${label} start`)
@@ -70,6 +83,7 @@ export function assertReleasedPayloadSemantics(event: SessionFormatEvent, versio
     case 'compaction/start':
     case 'compaction/end':
       nonEmptyString(data['compactionId'], `${label} compactionId`)
+      if (data['preparationId'] !== undefined) nonEmptyString(data['preparationId'], `${label} preparationId`)
       if (data['sourceCommandId'] !== undefined) nonEmptyString(data['sourceCommandId'], `${label} sourceCommandId`)
       nullableValue(data['turn'], `${label} turn`, countValue)
       if (data['error'] !== undefined) stringValue(data['error'], `${label} error`)
@@ -77,11 +91,55 @@ export function assertReleasedPayloadSemantics(event: SessionFormatEvent, versio
     case 'compaction/prune':
       shadowedValue(data, event.seq, label)
       return
+    case 'compaction/preparation/requested':
+      nonEmptyString(data['preparationId'], `${label} preparationId`)
+      earlierSeq(data['start'], event.seq, `${label} start`)
+      earlierSeq(data['end'], event.seq, `${label} end`)
+      seqArray(data['shadowedSeqs'], event.seq, `${label} shadowedSeqs`, false)
+      nonEmptyString(data['shadowedDigest'], `${label} shadowedDigest`)
+      countValue(data['shadowedTokenCount'], `${label} shadowedTokenCount`)
+      countValue(data['unitCount'], `${label} unitCount`)
+      if (data['preservationBrief'] !== undefined) stringValue(data['preservationBrief'], `${label} preservationBrief`)
+      return
+    case 'compaction/preparation/planned':
+    case 'compaction/preparation/ready':
+      nonEmptyString(data['preparationId'], `${label} preparationId`)
+      arrayValue(data['chunks'], `${label} chunks`, (value, itemLabel) => {
+        const chunk = releasedV0Record(value, itemLabel)
+        earlierSeq(chunk['startSeq'], event.seq, `${itemLabel} startSeq`)
+        earlierSeq(chunk['endSeq'], event.seq, `${itemLabel} endSeq`)
+      })
+      if (event.type === 'compaction/preparation/ready') contentBlocksValue(data['summary'], `${label} summary`, version)
+      return
+    case 'compaction/preparation/attempted':
+    case 'compaction/preparation/call':
+    case 'compaction/preparation/discarded':
+      nonEmptyString(data['preparationId'], `${label} preparationId`)
+      return
+    case 'compaction/preparation/edited':
+      nonEmptyString(data['preparationId'], `${label} preparationId`)
+      literalValue(data['source'], ['human', 'model'], `${label} source`)
+      contentBlocksValue(data['summary'], `${label} summary`, version)
+      return
+    case 'compaction/preparation/failed':
+      nonEmptyString(data['preparationId'], `${label} preparationId`)
+      stringValue(data['error'], `${label} error`)
+      if (data['attemptedCalls'] !== undefined) countValue(data['attemptedCalls'], `${label} attemptedCalls`)
+      return
+    case 'context/rewrite':
+      nonEmptyString(data['rewriteId'], `${label} rewriteId`)
+      if (data['contextRunId'] !== undefined) nonEmptyString(data['contextRunId'], `${label} contextRunId`)
+      literalValue(data['mode'], ['edit-and-continue', 'patch'], `${label} mode`)
+      earlierSeq(data['replacementSeq'], event.seq, `${label} replacementSeq`)
+      shadowedValue(data, event.seq, label)
+      return
     case 'compaction/summary':
       if (data['llmStreamCall'] === true && data['rawOutput'] === undefined) {
         throw new SessionFormatError(`${label} llmStreamCall requires rawOutput`)
       }
       nonEmptyString(data['compactionId'], `${label} compactionId`)
+      if (data['preparationId'] !== undefined) nonEmptyString(data['preparationId'], `${label} preparationId`)
+      if (data['summarySource'] !== undefined) literalValue(data['summarySource'], ['generated', 'human', 'model'], `${label} summarySource`)
       if (data['sourceCommandId'] !== undefined) nonEmptyString(data['sourceCommandId'], `${label} sourceCommandId`)
       contentBlocksValue(data['summary'], `${label} summary`, version)
       shadowedValue(data, event.seq, label)
@@ -547,9 +605,12 @@ function messageSourceValue(
   if (expected === 'tool' && source['kind'] !== 'tool') throw new SessionFormatError(`${label} must be tool source`)
   switch (source['kind']) {
     case 'user':
-      assertReleasedV0Keys(source, ['kind'], ['rpcId', 'clientTimeZone'], label)
+      assertReleasedV0Keys(source, ['kind'], ['rpcId', 'clientTimeZone', 'clientDevice'], label)
       if (source['rpcId'] !== undefined) nonEmptyString(source['rpcId'], `${label} rpcId`)
       if (source['clientTimeZone'] !== undefined) nonEmptyString(source['clientTimeZone'], `${label} clientTimeZone`)
+      if (source['clientDevice'] !== undefined) {
+        literalValue(source['clientDevice'], ['mobile-app', 'mobile-browser', 'desktop-browser'], `${label} clientDevice`)
+      }
       return
     case 'plugin':
       pluginSourceValue(source, label)
@@ -953,7 +1014,7 @@ function modelRouteValue(value: SessionFormatJsonValue | undefined, label: strin
 }
 
 function subagentDescriptorValue(data: JsonRecord, label: string): void {
-  literalValue(data['version'], [3], `${label} version`)
+  literalValue(data['version'], [2, 3], `${label} version`)
   nonEmptyString(data['provider'], `${label} provider`)
   if (data['mode'] === 'one-shot') {
     assertReleasedV0Keys(data, ['mode', 'version', 'provider'], ['label'], `${label} data`)
@@ -962,6 +1023,9 @@ function subagentDescriptorValue(data: JsonRecord, label: string): void {
   }
   literalValue(data['mode'], ['continuable'], `${label} mode`)
   nonEmptyString(data['label'], `${label} label`)
+  if (data['version'] === 2 && data['agentReasoningEffort'] !== undefined) {
+    throw new SessionFormatError(`${label} version 2 cannot contain agentReasoningEffort`)
+  }
   for (const key of ['agentProvider', 'agentModel', 'agentReasoningEffort', 'persona'] as const) {
     if (data[key] !== undefined) nonEmptyString(data[key], `${label} ${key}`)
   }

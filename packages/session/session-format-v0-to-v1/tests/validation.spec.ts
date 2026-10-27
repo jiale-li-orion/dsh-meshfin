@@ -35,6 +35,9 @@ const toolMessage = {
 
 const validPayloads: Readonly<Record<string, SessionFormatJsonValue>> = {
   'agent-preset/selected': { agentPreset: 'default' },
+  'agent/context-run/requested': { contextRunId: 'run-1', generationSeq: 0, source: { kind: 'context-rewrite' } },
+  'agent/context-run/claimed': { contextRunId: 'run-1', turn: 1 },
+  'agent/context-run/cancelled': { contextRunId: 'run-1', reason: 'cancelled' },
   'agent/inbox/spliced': { target: 'next-turn', start: 0, inserted: [userMessage] },
   'approval/asked': { id: 'approval-1', toolName: 'bash', callId: 'call-1', reason: 'needed' },
   'approval/decided': { id: 'approval-1', outcome: 'allowed-once' },
@@ -45,11 +48,26 @@ const validPayloads: Readonly<Record<string, SessionFormatJsonValue>> = {
   'command/run': { commandId: 'command-1', name: 'compact', args: ' now', source: { kind: 'user' } },
   'compaction/end': { compactionId: 'compact-1', turn: null },
   'compaction/prune': { shadowedRange: { start: 0, end: 1 }, shadowedSeqs: [0, 1], shadowedTokenCount: 2 },
+  'compaction/preparation/requested': {
+    preparationId: 'prep-1', start: 0, end: 1, shadowedSeqs: [0, 1],
+    shadowedDigest: 'digest', shadowedTokenCount: 2, unitCount: 1,
+  },
+  'compaction/preparation/planned': { preparationId: 'prep-1', plan: {}, chunks: [] },
+  'compaction/preparation/attempted': { preparationId: 'prep-1', attempt: {} },
+  'compaction/preparation/call': { preparationId: 'prep-1', call: {} },
+  'compaction/preparation/ready': { preparationId: 'prep-1', chunks: [], summary: [textBlock] },
+  'compaction/preparation/edited': { preparationId: 'prep-1', source: 'human', summary: [textBlock] },
+  'compaction/preparation/failed': { preparationId: 'prep-1', error: 'failed' },
+  'compaction/preparation/discarded': { preparationId: 'prep-1' },
   'compaction/start': { compactionId: 'compact-1', turn: 1 },
   'compaction/summary': {
     compactionId: 'compact-1', summary: [textBlock],
     shadowedRange: { start: 0, end: 1 }, shadowedSeqs: [0, 1], shadowedTokenCount: 2,
     provider: 'mock', model: 'mock', rawOutput: [textBlock], llmStreamCall: true,
+  },
+  'context/rewrite': {
+    rewriteId: 'rewrite-1', mode: 'patch', replacementSeq: 0,
+    shadowedRange: { start: 0, end: 1 }, shadowedSeqs: [0, 1], shadowedTokenCount: 2,
   },
   'feedback/record': { text: 'feedback' },
   'goal/change': {
@@ -214,8 +232,11 @@ function replaceAtPath(value: SessionFormatJsonValue, path: string, replacement:
 describe('released event and payload inventory', () => {
   it('has an executable valid fixture for every frozen released-v0 event type', () => {
     expect(Object.keys(validPayloads).sort()).toEqual([...RELEASED_V0_EVENT_TYPES].sort())
-    expect(RELEASED_V0_EVENT_TYPES).toHaveLength(51)
+    expect(RELEASED_V0_EVENT_TYPES).toHaveLength(63)
     expect(RELEASED_V0_EVENT_TYPES.filter(type => !KNOWN_SESSION_EVENT_TYPES.has(type))).toEqual([
+      'agent/context-run/cancelled',
+      'agent/context-run/claimed',
+      'agent/context-run/requested',
       'assistant/chunk',
       'tool/code-dispatch',
       'tool/code-dispatch-start',
@@ -401,6 +422,7 @@ describe('released event and payload inventory', () => {
   it('accepts every released nested union variant and optional member', () => {
     const sources: SessionFormatJsonValue[] = [
       { kind: 'user', rpcId: 'rpc-1', clientTimeZone: 'Asia/Shanghai' },
+      { kind: 'user', rpcId: 'rpc-2', clientTimeZone: 'Asia/Shanghai', clientDevice: 'desktop-browser' },
       { kind: 'plugin', plugin: 'plain' },
       { kind: 'plugin', plugin: 'instructions', form: 'instructions' },
       { kind: 'plugin', plugin: 'catalog', form: 'catalog' },
@@ -551,6 +573,43 @@ describe('released event and payload inventory', () => {
     for (const [type, data] of remaining) {
       expect(() => { assertPayload(type, data) }, type).not.toThrow()
     }
+  })
+
+  it.each(['mobile-app', 'mobile-browser', 'desktop-browser'])(
+    'preserves a released user source with clientDevice %s through v0 migration', (clientDevice) => {
+      const message = {
+        ...userMessage,
+        source: { kind: 'user', rpcId: 'request', clientDevice },
+      }
+      const event = { type: 'user/message', seq: 0, time: 1, data: message, surfaceOp: 'append' }
+      expect(restoreV0ToV1(v0Header, [event]).events).toEqual([event])
+      expect(() => {
+        assertPayload('agent/inbox/spliced', {
+          target: 'next-turn', start: 0, inserted: [message],
+        })
+      }).not.toThrow()
+    },
+  )
+
+  it.each(['tablet', '', null, 1])('refuses invalid historical clientDevice %s', (clientDevice) => {
+    const message = { ...userMessage, source: { kind: 'user', clientDevice } }
+    expect(() => { assertPayload('user/message', message) }).toThrow(/clientDevice/)
+  })
+
+  it('retains released descriptor v2 while refusing future or cross-version fields', () => {
+    const event = {
+      type: 'subagent/descriptor', seq: 0, time: 1,
+      data: {
+        version: 2, mode: 'continuable', provider: 'spawn', label: 'child',
+        agentProvider: 'mock', agentModel: 'mock',
+      },
+    }
+    expect(restoreV0ToV1(v0Header, [event]).events).toEqual([event])
+    expect(() => restoreV0ToV1(v0Header, [{ ...event, data: { ...event.data, version: 4 } }]))
+      .toThrow(/version/)
+    expect(() => restoreV0ToV1(v0Header, [{
+      ...event, data: { ...event.data, agentReasoningEffort: 'low' },
+    }])).toThrow(/version 2 cannot contain agentReasoningEffort/)
   })
 
   it('validates legacy round-zero goal mutation messages', () => {

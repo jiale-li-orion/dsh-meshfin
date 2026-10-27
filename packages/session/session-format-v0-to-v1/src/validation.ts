@@ -23,6 +23,9 @@ const SURFACE_EVENT_TYPES = new Set(['user/message', 'assistant/message', 'tool/
 const SURFACE_OPTIONAL = ['ignorable', 'sourceEventSeqs', 'surfaceOp'] as const
 const LOG_OPTIONAL = ['ignorable'] as const
 const LEGACY_SOURCE_TYPES = new Set([
+  'agent/context-run/requested',
+  'agent/context-run/claimed',
+  'agent/context-run/cancelled',
   'steering/message',
   'request/header-delta',
   'mode/set',
@@ -197,12 +200,12 @@ export function assertReleasedEventPayload(event: SessionFormatEvent, version: 0
   const data = releasedV0Record(event.data, `${event.type} ${event.seq} data`)
   if (event.type === 'subagent/descriptor' && data['version'] !== 3) {
     const descriptorVersion = sessionFormatCount(data['version'], `${event.type} ${event.seq} version`)
-    if (version === 0) {
+    if (version === 0 && descriptorVersion !== 2) {
       throw new SessionFormatUnsupportedMigrationError(
         `${event.type} ${event.seq} uses unsupported descriptor version ${descriptorVersion}`,
       )
     }
-    return
+    if (version === 1) return
   }
   const versionOptional = version === 1 && event.type === 'session-log-deepseek/delivery-accepted'
     ? [...disposition.optional, 'sessionFormatVersion']

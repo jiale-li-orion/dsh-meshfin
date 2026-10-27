@@ -36,6 +36,9 @@ const disposition = defineReleasedPayloadDisposition
  */
 export const RELEASED_V0_EVENT_DISPOSITIONS: Readonly<Record<string, ReleasedV0PayloadDisposition>> = Object.freeze({
   'agent-preset/selected': disposition(['agentPreset']),
+  'agent/context-run/requested': disposition(['contextRunId', 'generationSeq', 'source']),
+  'agent/context-run/claimed': disposition(['contextRunId', 'turn']),
+  'agent/context-run/cancelled': disposition(['contextRunId', 'reason']),
   'agent/inbox/spliced': disposition(
     ['target', 'start', 'inserted'],
     ['removedCount', 'outcome'],
@@ -50,14 +53,29 @@ export const RELEASED_V0_EVENT_DISPOSITIONS: Readonly<Record<string, ReleasedV0P
   ),
   'command/done': disposition(['commandId', 'kind'], ['text', 'sourceEventSeq']),
   'command/run': disposition(['commandId', 'name', 'source'], ['args']),
-  'compaction/end': disposition(['compactionId', 'turn'], ['sourceCommandId', 'error']),
+  'compaction/end': disposition(['compactionId', 'turn'], ['sourceCommandId', 'error', 'preparationId']),
   'compaction/prune': disposition(['shadowedRange', 'shadowedSeqs', 'shadowedTokenCount']),
-  'compaction/start': disposition(['compactionId', 'turn'], ['sourceCommandId']),
+  'compaction/preparation/requested': disposition(
+    ['preparationId', 'start', 'end', 'shadowedSeqs', 'shadowedDigest', 'shadowedTokenCount', 'unitCount'],
+    ['preservationBrief'],
+  ),
+  'compaction/preparation/planned': disposition(['preparationId', 'plan', 'chunks'], [], ['plan', 'chunks']),
+  'compaction/preparation/attempted': disposition(['preparationId', 'attempt'], [], ['attempt']),
+  'compaction/preparation/call': disposition(['preparationId', 'call'], [], ['call']),
+  'compaction/preparation/ready': disposition(['preparationId', 'chunks', 'summary'], [], ['chunks']),
+  'compaction/preparation/edited': disposition(['preparationId', 'source', 'summary']),
+  'compaction/preparation/failed': disposition(['preparationId', 'error'], ['attemptedCalls']),
+  'compaction/preparation/discarded': disposition(['preparationId']),
+  'compaction/start': disposition(['compactionId', 'turn'], ['sourceCommandId', 'preparationId']),
   'compaction/summary': disposition(
     ['compactionId', 'summary', 'shadowedRange', 'shadowedSeqs', 'shadowedTokenCount', 'provider', 'model'],
-    ['sourceCommandId', 'maxTokens', 'usage', 'rawOutput', 'llmStreamCall'],
+    ['sourceCommandId', 'preparationId', 'summarySource', 'maxTokens', 'usage', 'rawOutput', 'llmStreamCall'],
   ),
   'feedback/record': disposition(['text']),
+  'context/rewrite': disposition(
+    ['rewriteId', 'mode', 'replacementSeq', 'shadowedRange', 'shadowedSeqs', 'shadowedTokenCount'],
+    ['contextRunId'],
+  ),
   'goal/change': disposition(
     ['kind', 'version', 'operation'],
     ['goal', 'roundsStarted', 'createdAt', 'updatedAt', 'cleared', 'clearedAt'],

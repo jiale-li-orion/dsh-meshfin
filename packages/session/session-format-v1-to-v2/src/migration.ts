@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { AssistantStreamAccumulator } from '@deepseek-ai/dsh-llm'
 import type { AssistantStreamRecord } from '@deepseek-ai/dsh-llm'
 import {
@@ -395,10 +396,12 @@ function legacyInterruptedTurn(
   event: SessionFormatEvent,
 ): SessionFormatEvent | undefined {
   if (event.type !== 'turn/start' || state.openTurn === null || state.openStep !== null
-    || coordinate(record(event.data)['turn']) !== state.openTurn + 1
-    || state.previous?.type !== 'agent/inbox/spliced') return undefined
-  const splice = record(state.previous.data)
-  if (splice['target'] !== 'next-turn' || !Array.isArray(splice['inserted']) || splice['inserted'].length === 0) {
+    || coordinate(record(event.data)['turn']) !== state.openTurn + 1) return undefined
+  const previous = state.previous
+  const contextResume = previous?.type === 'agent/context-run/requested'
+  const splice = previous?.type === 'agent/inbox/spliced' ? record(previous.data) : undefined
+  if (!contextResume && (splice?.['target'] !== 'next-turn'
+    || !Array.isArray(splice['inserted']) || splice['inserted'].length === 0)) {
     return undefined
   }
   return {
@@ -610,6 +613,37 @@ function remapPayloadReferences(
 ): SessionFormatJsonValue {
   const data = record(event.data)
   switch (event.type) {
+    case 'agent/context-run/requested':
+      return { ...data, generationSeq: mapOne(coordinate(data['generationSeq']), mapping, `${event.type} ${event.seq} generationSeq`) }
+    case 'compaction/preparation/requested': {
+      const shadowedSeqs = mapList(numberArray(data['shadowedSeqs'] as SessionFormatJsonValue), mapping, `${event.type} ${event.seq} shadowedSeqs`)
+      return {
+        ...data,
+        start: mapOne(coordinate(data['start']), mapping, `${event.type} ${event.seq} start`),
+        end: mapOne(coordinate(data['end']), mapping, `${event.type} ${event.seq} end`),
+        shadowedSeqs,
+        shadowedDigest: createHash('sha256').update(shadowedSeqs.join(',')).digest('base64url'),
+      }
+    }
+    case 'compaction/preparation/planned':
+    case 'compaction/preparation/ready':
+      return { ...data, chunks: (data['chunks'] as SessionFormatJsonObject[]).map(chunk => ({
+        ...chunk,
+        startSeq: mapOne(coordinate(chunk['startSeq']), mapping, `${event.type} ${event.seq} chunk startSeq`),
+        endSeq: mapOne(coordinate(chunk['endSeq']), mapping, `${event.type} ${event.seq} chunk endSeq`),
+      })) }
+    case 'context/rewrite': {
+      const range = record(data['shadowedRange'])
+      return {
+        ...data,
+        replacementSeq: mapOne(coordinate(data['replacementSeq']), mapping, `${event.type} ${event.seq} replacementSeq`),
+        shadowedRange: {
+          start: mapOne(coordinate(range['start']), mapping, `${event.type} ${event.seq} range start`),
+          end: mapOne(coordinate(range['end']), mapping, `${event.type} ${event.seq} range end`),
+        },
+        shadowedSeqs: mapList(numberArray(data['shadowedSeqs'] as SessionFormatJsonValue), mapping, `${event.type} ${event.seq} shadowedSeqs`),
+      }
+    }
     case 'command/done':
       return data['sourceEventSeq'] === undefined
         ? data

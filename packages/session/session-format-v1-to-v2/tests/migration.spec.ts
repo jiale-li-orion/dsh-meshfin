@@ -478,6 +478,29 @@ describe('sessionFormatV1ToV2', () => {
     expect(() => migrateV1ToV2(invalid)).toThrow(/turn\/start 2/)
   })
 
+  it('closes an open turn when a historical context-run request starts the next turn', () => {
+    const source: SessionFormatArtifact = {
+      header: { version: 1, id: 'legacy-context-resume', createdAt: 1, isSeeded: false, delegationDepth: 0 },
+      inheritedEventCount: 0,
+      events: [
+        event('turn/start', 0, 1, { turn: 1 }),
+        event('step/start', 1, 2, { turn: 1, step: 1 }),
+        event('step/end', 2, 3, { turn: 1, step: 1 }),
+        { ...event('agent/context-run/requested', 3, 4, {
+          contextRunId: 'run-1', generationSeq: 2, source: { kind: 'context-rewrite' },
+        }), ignorable: true },
+        event('turn/start', 4, 5, { turn: 2 }),
+        event('turn/end', 5, 6, { turn: 2, reason: { kind: 'completed' } }),
+      ],
+    }
+    const migrated = migrateV1ToV2(source)
+    expect(migrated.events.map(candidate => candidate.type)).toEqual([
+      'turn/start', 'step/start', 'step/end', 'agent/context-run/requested',
+      'turn/end', 'turn/start', 'turn/end',
+    ])
+    expect(migrated.events[4]).toMatchObject({ data: { turn: 1, reason: { kind: 'interrupted' } } })
+  })
+
   it('embeds an interleaved successful stream and densely remaps survivors', () => {
     const source: SessionFormatArtifact = {
       header: {

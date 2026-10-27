@@ -1,5 +1,7 @@
 /** Explicit local-coordinate remapping; captured generations and owner-local counters remain opaque. */
 
+import { createHash } from 'node:crypto'
+
 import { SessionFormatError, sessionFormatCount } from '@deepseek-ai/dsh-session-format'
 import type { SessionFormatEvent, SessionFormatJsonObject, SessionFormatJsonValue } from '@deepseek-ai/dsh-session-format'
 import { record } from './payload.ts'
@@ -28,6 +30,24 @@ export function remapEvent(event: SessionFormatEvent, seq: number, mapping: read
   }
   let data = record(event.data, event.type)
   switch (event.type) {
+    case 'agent/context-run/requested':
+      data = { ...data, generationSeq: one(data['generationSeq']) }
+      break
+    case 'compaction/preparation/requested': {
+      const shadowedSeqs = list(data['shadowedSeqs'])
+      data = { ...data, start: one(data['start']), end: one(data['end']), shadowedSeqs,
+        shadowedDigest: createHash('sha256').update(shadowedSeqs.join(',')).digest('base64url') }
+      break
+    }
+    case 'compaction/preparation/planned':
+    case 'compaction/preparation/ready':
+      data = { ...data, chunks: (data['chunks'] as SessionFormatJsonObject[]).map(chunk => ({
+        ...chunk, startSeq: one(chunk['startSeq']), endSeq: one(chunk['endSeq']),
+      })) }
+      break
+    case 'context/rewrite':
+      data = { ...data, replacementSeq: one(data['replacementSeq']), shadowedRange: range(data['shadowedRange']), shadowedSeqs: list(data['shadowedSeqs']) }
+      break
     case 'command/done':
       if (data['sourceEventSeq'] !== undefined) data = { ...data, sourceEventSeq: one(data['sourceEventSeq']) }
       break

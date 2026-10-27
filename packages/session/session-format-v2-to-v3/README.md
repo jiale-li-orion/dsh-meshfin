@@ -83,7 +83,13 @@ Source events must be dense from zero. Each original event receives its target p
 | Surface envelope | `sourceEventSeqs[]`; `surfaceOp.start/end` before their canonical rename |
 | `command/done.data` | `sourceEventSeq` when present |
 | `compaction/summary.data` and `compaction/prune.data` | `shadowedRange.start/end` and `shadowedSeqs[]` |
+| `compaction/preparation/requested.data` | `start`, `end`, and `shadowedSeqs[]` |
+| `compaction/preparation/planned.data` and `compaction/preparation/ready.data` | Each chunk's `startSeq` and `endSeq` |
+| `context/rewrite.data` | `replacementSeq`, `shadowedRange.start/end`, and `shadowedSeqs[]` |
+| Retired `agent/context-run/requested.data` | `generationSeq`; later retained as an ignorable historical record |
 | `session/title.data` and `session/title-llm-request.data` | `messageSeqs[]` |
+
+The mapped preparation membership receives a matching `shadowedDigest`.
 
 There is no recursive numeric-field rewrite. Delivery `throughSeq` and `sessionFormatVersion`, session-reference `capturedThroughSeq` and `capturedFormatVersion`, workflow-local `seq`, stream block indices, turn/step numbers, inbox indices, token/byte counts, and all ids keep their source values. Embedded assistant streams, model replay state, tool arguments/results, title-request input text and `data.system` retain their recorded meaning. Compaction payload endpoints keep the names `start/end`; only envelope replacement endpoints are renamed.
 

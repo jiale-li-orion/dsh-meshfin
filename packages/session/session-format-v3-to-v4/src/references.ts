@@ -1,5 +1,6 @@
 /** Remap released V3 local event references after interrupted-turn insertion. */
 
+import { createHash } from 'node:crypto'
 import { SessionFormatError, isSessionFormatJsonObject, sessionFormatCount } from '@deepseek-ai/dsh-session-format'
 import type { SessionFormatEvent, SessionFormatJsonObject, SessionFormatJsonValue } from '@deepseek-ai/dsh-session-format'
 
@@ -29,6 +30,31 @@ export function remapV3References(event: SessionFormatEvent, seq: number, mappin
   }
   let data = event.data
   switch (event.type) {
+    case 'compaction/preparation/requested': {
+      const source = object(data)
+      const shadowedSeqs = references(source['shadowedSeqs'])
+      data = { ...source, start: reference(source['start']), end: reference(source['end']), shadowedSeqs,
+        shadowedDigest: createHash('sha256').update(shadowedSeqs.join(',')).digest('base64url') }
+      break
+    }
+    case 'compaction/preparation/planned':
+    case 'compaction/preparation/ready': {
+      const source = object(data)
+      if (!Array.isArray(source['chunks'])) throw new SessionFormatError('preparation chunks must be an array')
+      data = { ...source, chunks: (source['chunks'] as SessionFormatJsonValue[]).map((chunk) => {
+        const value = object(chunk)
+        return { ...value, startSeq: reference(value['startSeq']), endSeq: reference(value['endSeq']) }
+      }) }
+      break
+    }
+    case 'context/rewrite': {
+      const source = object(data)
+      const selected = object(source['shadowedRange'])
+      data = { ...source, replacementSeq: reference(source['replacementSeq']),
+        shadowedRange: { ...selected, start: reference(selected['start']), end: reference(selected['end']) },
+        shadowedSeqs: references(source['shadowedSeqs']) }
+      break
+    }
     case 'command/done': {
       const source = object(data)
       if (source['sourceEventSeq'] !== undefined) data = { ...source, sourceEventSeq: reference(source['sourceEventSeq']) }

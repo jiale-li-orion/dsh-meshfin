@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createHash } from 'node:crypto'
 import { SessionFormatEventCollector } from '@deepseek-ai/dsh-session-format'
 import type { SessionFormatEvent, SessionFormatJsonObject, SessionFormatJsonValue } from '@deepseek-ai/dsh-session-format'
 import { assertReleasedV3Header, releasedV3SessionFormatCodec, restoreReleasedV3Artifact, sessionFormatV2ToV3 } from '../src/index.ts'
@@ -117,6 +118,15 @@ describe('tool result restoration', () => {
 })
 
 describe('coordinate remapping', () => {
+  it('remaps reviewed preparation membership and its coordinate digest', () => {
+    const source = { ...event('compaction/preparation/requested', {
+      preparationId: 'prep', start: 0, end: 1, shadowedSeqs: [0, 1],
+      shadowedDigest: 'old', shadowedTokenCount: 2, unitCount: 1,
+    }), seq: 2 }
+    const mapped = remapEvent(source, 3, [0, 2])
+    expect(mapped.data).toMatchObject({ start: 0, end: 2, shadowedSeqs: [0, 2],
+      shadowedDigest: createHash('sha256').update('0,2').digest('base64url') })
+  })
   it('rejects dangling mappings and malformed reference arrays at the mapper boundary', () => {
     const source = { ...event('command/done', { sourceEventSeq: 1 }), seq: 2 }
     expect(() => remapEvent(source, 3, [])).toThrow(/earlier/)

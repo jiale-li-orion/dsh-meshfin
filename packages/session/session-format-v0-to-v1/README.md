@@ -46,6 +46,8 @@ The alpha edge refuses every event type outside its frozen inventory, including 
 
 The bounded historical normalizers convert `steering/message` to `user/message`, rename `compact/*` events to `compaction/*`, remove `turn/start.trigger`, convert retired `turn/end` reasons, add current message wrappers and deterministic ids for legacy messages, retry chains, and compaction groups, and remove the obsolete `request/header.header.messagePrefix` duplicate. Retired `request/header-delta`, `mode/set`, and the `request/header` fallback reason refuse migration. No other event, reference, source, or payload fact may change.
 
+The inventory also admits evidenced rc.7 history: user-message `clientDevice`, version-2 subagent descriptors, context rewrites, and reviewed compaction preparations. Retired `agent/context-run/*` lifecycle records retain their payloads as ignorable historical events; they do not request a new model run during restoration. Later adjacent edges remap their declared Session-sequence references. Source files remain unchanged.
+
 -----
 
 <a id="understand-the-implementation"></a>

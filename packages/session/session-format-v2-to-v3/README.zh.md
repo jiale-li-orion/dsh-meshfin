@@ -83,7 +83,13 @@ const targetHeader = sessionFormatV2ToV3.migrateHeader(sourceHeader)
 | Surface 信封 | `sourceEventSeqs[]`；规范重命名前的 `surfaceOp.start/end` |
 | `command/done.data` | 存在时的 `sourceEventSeq` |
 | `compaction/summary.data` 和 `compaction/prune.data` | `shadowedRange.start/end` 和 `shadowedSeqs[]` |
+| `compaction/preparation/requested.data` | `start`、`end` 和 `shadowedSeqs[]` |
+| `compaction/preparation/planned.data` 和 `compaction/preparation/ready.data` | 每个 chunk 的 `startSeq` 和 `endSeq` |
+| `context/rewrite.data` | `replacementSeq`、`shadowedRange.start/end` 和 `shadowedSeqs[]` |
+| 已停用的 `agent/context-run/requested.data` | `generationSeq`；后续作为可忽略的历史记录保留 |
 | `session/title.data` 和 `session/title-llm-request.data` | `messageSeqs[]` |
+
+重映射后的准备记录成员序号也会得到匹配的 `shadowedDigest`。
 
 不存在递归数值字段改写。投递的 `throughSeq` 和 `sessionFormatVersion`、会话引用的 `capturedThroughSeq` 和 `capturedFormatVersion`、工作流本地 `seq`、流块索引、轮次/步骤编号、收件箱索引、token/字节计数以及所有标识都保留源值。内嵌 assistant 流、模型回放状态、工具参数/结果、标题请求输入文本及 `data.system` 保留已记录的含义。压缩（compaction）载荷端点保持 `start/end` 名称；仅信封替换端点被重命名。
 

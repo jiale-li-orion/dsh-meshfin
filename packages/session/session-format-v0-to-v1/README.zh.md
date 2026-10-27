@@ -46,6 +46,8 @@ Alpha 迁移边会拒绝冻结清单之外的所有事件类型，包括带有 `
 
 有限的历史规范化会把 `steering/message` 转换为 `user/message`、把 `compact/*` 事件重命名为 `compaction/*`、移除 `turn/start.trigger`、转换已停用的 `turn/end` reason、添加当前消息包装层，并为旧消息、retry chain 与压缩（compaction）组补充确定性 id，同时移除已停用且重复的 `request/header.header.messagePrefix`。已停用的 `request/header-delta`、`mode/set` 和 `request/header` fallback reason 会使迁移失败。除此之外，任何事件、引用、来源或 payload 事实都不得改变。
 
+清单还接纳有实际日志证据的 rc.7 历史结构：用户消息的 `clientDevice`、版本 2 的 subagent descriptor、上下文重写和经审阅的压缩准备。已停用的 `agent/context-run/*` 生命周期记录会保留载荷，作为可忽略的历史事件；还原时不会由此发起新的模型运行。后续相邻迁移边会重映射其中已声明的会话序号引用。源文件保持不变。
+
 -----
 
 <a id="understand-the-implementation"></a>

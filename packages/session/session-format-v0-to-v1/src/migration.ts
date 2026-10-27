@@ -99,7 +99,11 @@ function normalizeReleasedV0Event(
   if (message.type !== 'assistant/chunk') assertReleasedEventPayload(message, 0)
   const messageId = eventMessageId(message)
   if (messageId !== undefined) state.messageIds.set(message.seq, messageId)
-  return message
+  // The rc.7 context-run lifecycle was retired. Preserve its payload as an
+  // ignorable historical record; v3 -> v4 gives it a plugin namespace.
+  return message.type.startsWith('agent/context-run/')
+    ? { ...message, ignorable: true }
+    : message
 }
 
 function normalizeLegacyCompactionType(event: SessionFormatEvent): SessionFormatEvent {

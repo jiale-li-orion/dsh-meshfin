@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createHash } from 'node:crypto'
 import { SessionFormatEventCollector, type SessionFormatEvent, type SessionFormatJsonObject } from '@deepseek-ai/dsh-session-format'
 import { createSessionFormatCatalogWithChildren, sessionFormatCatalog } from '@deepseek-ai/dsh-session-format-catalog'
 import { Session, SessionId, SessionLogOffset, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
@@ -140,6 +141,12 @@ describe('V3 interrupted-turn migration', () => {
   })
 
   it('remaps prune ranges and optional command references without interpreting unrelated data', () => {
+    const requested = remapV3References({ ...row('compaction/preparation/requested', {
+      preparationId: 'prep', start: 0, end: 1, shadowedSeqs: [0, 1], shadowedDigest: 'old',
+      shadowedTokenCount: 2, unitCount: 1,
+    }), seq: 2, time: 1 }, 3, [0, 2])
+    expect(requested.data).toMatchObject({ start: 0, end: 2, shadowedSeqs: [0, 2],
+      shadowedDigest: createHash('sha256').update('0,2').digest('base64url') })
     expect(remapV3References({ ...row('compaction/prune', { shadowedRange: { start: 0, end: 1 }, shadowedSeqs: [0, 1] }), seq: 2, time: 1 }, 3, [0, 2]).data)
       .toEqual({ shadowedRange: { start: 0, end: 2 }, shadowedSeqs: [0, 2] })
     expect(remapV3References({ ...row('command/done', { commandId: 'c', kind: 'error' }), seq: 1, time: 1 }, 2, [0]).data)
