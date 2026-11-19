@@ -65,6 +65,18 @@ test('registers a duck-typed adapter under its own provider id', () => {
   assert.deepEqual(registration.providers, ['my-think-route'])
   assert.equal(registration.adapter.providerInfo('my-think-route').id, 'my-think-route')
   assert.equal(typeof registration.adapter.stream, 'function')
+  assert.equal(typeof registration.adapter.prepareCall, 'function')
+})
+
+test('prepares a model-bound stream using the rc.2 LLM adapter contract', async () => {
+  const { registration } = registerAdapterCtx({})
+  const prepared = await registration.adapter.prepareCall('deepseek-wire-think', 'deepseek-v4-flash')
+  assert.equal(prepared.model.provider, 'deepseek-wire-think')
+  assert.equal(prepared.model.id, 'deepseek-v4-flash')
+  assert.equal(typeof prepared.stream, 'function')
+  const controller = new AbortController()
+  controller.abort()
+  await assert.rejects(registration.adapter.prepareCall('deepseek-wire-think', 'deepseek-v4-flash', controller.signal), { name: 'AbortError' })
 })
 
 test('a duplicate registration is caught and warned, never thrown', () => {
