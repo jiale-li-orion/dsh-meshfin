@@ -471,6 +471,16 @@ export function apply(ctx, config) {
         },
       }
     },
+    // DSH rc.2 freezes model metadata together with the adapter's stream
+    // entry point before starting a request. Duck-typed routes must expose
+    // this seam just as LlmAdapter does, not only resolveModel/stream.
+    async prepareCall(id, model, signal) {
+      signal?.throwIfAborted()
+      return {
+        model: await this.resolveModel(id, model, signal),
+        stream: (options) => this.stream(options),
+      }
+    },
     async * stream(options) {
       const connection = resolveConnection(ctx, config)
       const apiKey = await resolveApiKey(ctx, connection.apiKeyEnv)
