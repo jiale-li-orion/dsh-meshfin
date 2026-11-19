@@ -24,7 +24,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-workbench/remote'
 import type { WorkbenchView } from '@deepseek-ai/dsh-workbench/types'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
-import { WORKBENCH_TAB_ID, workbenchDefinition } from './definition.ts'
+import { WORKBENCH_OPEN_COMMAND, WORKBENCH_TAB_ID, WORKBENCH_TAB_KIND, workbenchDefinition } from './definition.ts'
 import { en, NS, zh } from './locales.ts'
 import { SharedWorkbenchView } from './shared-view.ts'
 import { createWorkbenchTabStore } from './store.ts'
@@ -59,6 +59,21 @@ export function apply(ctx: ClientContext): void {
   }, 'ui-workbench: shared view projection')
 
   const t = ctx.locale.bind(NS)
+  // Route the guide's command through the originating pane, like files and terminal.
+  ctx.inject(['shortcuts', 'sidebarRight'], (scoped) => {
+    scoped.effect(() => scoped.shortcuts.register({
+      id: WORKBENCH_OPEN_COMMAND,
+      label: () => t('title'),
+      aliases: ['workbench', 'shared view'],
+      defaults: {},
+      regions: ['page', 'editable'], modals: [],
+      resolve: ({ target: element }) => {
+        const target = scoped.sidebarRight.commandTarget(element)
+        if (target === undefined) return { status: 'blocked', reason: t('shortcut.noSession') }
+        return { status: 'handled', run: () => { scoped.sidebarRight.openTabFromTarget(WORKBENCH_TAB_KIND, target) } }
+      },
+    }), 'ui-workbench: open command')
+  })
   ctx.effect(() => ctx.sidebarRightTabs.register(workbenchDefinition(t)), 'ui-workbench: workbench type')
   const store = createWorkbenchTabStore()
   ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab', () => ctx.slots.register({
