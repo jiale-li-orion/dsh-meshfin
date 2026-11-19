@@ -17,7 +17,8 @@ import { apply as applyLocale, inject as localeInject } from '@deepseek-ai/dsh-c
 import { SidebarRightTabRegistry } from '@deepseek-ai/dsh-client-ui-sidebar-right/src/client/tab-registry.ts'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkbenchView } from '@deepseek-ai/dsh-workbench/types'
-import { WORKBENCH_TAB_ID, WORKBENCH_TAB_KIND } from '../src/client/definition.ts'
+import type { ShortcutCommand } from '@deepseek-ai/dsh-client-shortcuts/client'
+import { WORKBENCH_OPEN_COMMAND, WORKBENCH_TAB_ID, WORKBENCH_TAB_KIND } from '../src/client/definition.ts'
 import { apply, inject } from '../src/client/index.ts'
 import { en, NS, zh } from '../src/client/locales.ts'
 import { WorkbenchBody } from '../src/client/WorkbenchBody.tsx'
@@ -68,7 +69,7 @@ function fakeRemote(initial: WorkbenchView = { open: false, active: null }) {
  * @param initial - the view the stubbed host answers `state()` with.
  * @returns the context, the plugin fiber, the registries, and the doubles.
  */
-async function bench(initial: WorkbenchView = { open: false, active: null }) {
+async function bench(initial: WorkbenchView = { open: false, active: null }, withShortcut = false) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   ctx.slots.register({
@@ -87,6 +88,20 @@ async function bench(initial: WorkbenchView = { open: false, active: null }) {
   ctx.provide('configForms', { developerTools: { enabled: createSnapshotStore(true) }, get: () => stubConfigForm().scope } as never)
   const tabs = new SidebarRightTabRegistry(ctx)
   ctx.provide('sidebarRightTabs', tabs as never)
+  const commands = new Map<string, ShortcutCommand>()
+  const target = { sessionId: 'session-7', paneId: 'pane-7' }
+  const commandTarget = vi.fn<() => typeof target | undefined>(() => target)
+  const openTabFromTarget = vi.fn()
+  if (withShortcut) {
+    ctx.provide('sidebarRight', { commandTarget, openTabFromTarget } as never)
+    ctx.provide('shortcuts', {
+      register(command: ShortcutCommand) {
+        commands.set(command.id, command)
+        return () => { commands.delete(command.id) }
+      },
+      catalog: createSnapshotStore([]),
+    })
+  }
   await ctx.plugin({ inject: localeInject, apply: applyLocale }).await()
   // These specs assert the shipped Chinese copy. There is no jsdom `window` in
   // this lane, so browser-language detection never runs and the locale comes
@@ -95,7 +110,7 @@ async function bench(initial: WorkbenchView = { open: false, active: null }) {
   const fiber = ctx.plugin({ inject: [...inject], apply })
   onTestFinished(async () => { await fiber.dispose() })
   await fiber.await()
-  return { ctx, fiber, tabs, namespace, handlers }
+  return { ctx, fiber, tabs, namespace, handlers, commands, target, commandTarget, openTabFromTarget }
 }
 
 /** The bound write set the framework hands a session-scoped inject factory. */
@@ -119,6 +134,20 @@ function injectedOf(ctx: Context, seat: Seat, sessionId = 'session-7'): unknown 
 describe('ui-workbench browser half', () => {
   it('declares the services it binds, including the generated Remote namespace', () => {
     expect(inject).toEqual(['slots', 'locale', 'sidebarRightTabs', 'remote', 'remote.workbench'])
+  })
+
+  it('routes the advertised workbench shortcut to the originating session pane', async () => {
+    const { tabs, commands, target, commandTarget, openTabFromTarget } = await bench(undefined, true)
+    expect(tabs.get(WORKBENCH_TAB_KIND)?.guide?.[0]?.commandId).toBe(WORKBENCH_OPEN_COMMAND)
+    const command = commands.get(WORKBENCH_OPEN_COMMAND)
+    expect(command).toBeDefined()
+    const resolved = command!.resolve({ target: null } as Parameters<ShortcutCommand['resolve']>[0])
+    expect(resolved.status).toBe('handled')
+    if (resolved.status === 'handled') resolved.run()
+    expect(openTabFromTarget).toHaveBeenCalledWith(WORKBENCH_TAB_KIND, target)
+    commandTarget.mockReturnValue(undefined)
+    const blocked = command!.resolve({ target: null } as Parameters<ShortcutCommand['resolve']>[0])
+    expect(blocked.status).toBe('blocked')
   })
 
   it('registers the type with its kind, and takes it back on dispose', async () => {

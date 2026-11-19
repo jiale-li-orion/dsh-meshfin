@@ -13,6 +13,7 @@ export const NS = 'workbench'
 /** Simplified Chinese dictionary and key-set source of truth. */
 export const zh = {
   title: '工作台',
+  'shortcut.noSession': '先在会话里打开工作台标签页',
   'panel.preview': '预览',
   'control.open': '打开面板',
   'control.toggle': '切换工作台',
@@ -38,6 +39,7 @@ export type WorkbenchKey = keyof typeof zh
 /** English dictionary, checked against the Chinese key set. */
 export const en = {
   title: 'Workbench',
+  'shortcut.noSession': 'Open a session before opening the Workbench tab',
   'panel.preview': 'Preview',
   'control.open': 'Open panel',
   'control.toggle': 'Toggle workbench',
