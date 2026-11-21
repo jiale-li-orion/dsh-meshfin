@@ -9,11 +9,15 @@
  * @module @deepseek-ai/dsh-client-ui-workbench/client/definition
  */
 import type { TranslateNS } from '@deepseek-ai/dsh-client-locale/client'
+import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { SidebarRightTabDefinition } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { NS } from './locales.ts'
 
 /** The tab kind this package owns. */
 export const WORKBENCH_TAB_KIND = 'workbench'
+
+/** Command advertised by the right sidebar guide. */
+export const WORKBENCH_OPEN_COMMAND = 'workbench.open' as ShortcutCommandId
 
 /** This implementation's identity in the tab system: the key its body and title register under. */
 export const WORKBENCH_TAB_ID = '@deepseek-ai/dsh-client-ui-workbench'
@@ -29,5 +33,6 @@ export function workbenchDefinition(t: TranslateNS<typeof NS>): SidebarRightTabD
     kind: WORKBENCH_TAB_KIND,
     priority: 'builtin',
     title: () => t('title'),
+    guide: [{ id: 'open', order: 30, title: () => t('title'), commandId: WORKBENCH_OPEN_COMMAND }],
   }
 }
